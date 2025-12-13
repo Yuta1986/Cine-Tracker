@@ -37,9 +37,15 @@ Local dev seeds:
 
 Windows executables must be built on Windows (PyInstaller does not cross-compile).
 
+Note: don’t run `build_windows.bat` from `\\wsl.localhost\...` as the current directory (CMD prints “UNC paths are not supported”). If needed, start CMD normally and use `pushd` into the repo first.
+
 From a Windows terminal in the repo root:
 - Build (optionally fetch COLMAP): `build_windows.bat --fetch-colmap`
 - Build (no downloads): `build_windows.bat`
+- Choose output folder in Explorer: `build_windows.bat --choose-dist`
+- Explicit output folder: `build_windows.bat --distpath "D:\\Apps\\CineTracker" --fetch-colmap`
+
+Windows builds use a separate venv folder: `.venv-win` (so it doesn’t conflict with the Linux/WSL `.venv`).
 
 Output:
 - Windows: `dist\\windows\\Windows_CineTracker\\Windows_CineTracker.exe`
