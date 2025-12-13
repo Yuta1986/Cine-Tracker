@@ -36,6 +36,10 @@
 | **Completed (S3.3/S3.4)** | Done | Packaging plan + PyInstaller spec + runtime bootstrap that sets `COLMAP_BIN` / `FFMPEG_BIN` from bundled `third_party/bin` at startup. |
 | **Next Action** | Pending | Execute **S4.1 / S4.2**: UE Python scripts (Lens File asset creation from JSON + Alembic import/binding to Cine Camera + Level Sequence). |
 | **I/O Logic** | Defined | COLMAP poses ($T_{W \\to C}$) must be inverted for UE/Alembic ($T_{C \\to W}$). |
+| **S4.1 (UE Lens File Script)** | Implemented (needs UE run) | Added UE Python script to create a LensFile asset from `lens_calibration_data.json` and populate Brown-Conrady distortion where public API exists. |
+| **S4.2 (UE Alembic Import/Bind Script)** | Implemented (needs UE run) | Added UE Python script to import Alembic, create/find CineCameraActor, assign LensFile, and bind actor to a Level Sequence (Alembic-to-camera track creation is UE-version dependent). |
+| **S4.3 (UAT Checklist)** | Drafted | Added UAT checklist for end-to-end validation in UE 5.7. |
+| **S4.4 (Docs Outline)** | Drafted | Added documentation outline including licensing + troubleshooting sections. |
 
 ---
 **END OF PROJECT MEMORY**
