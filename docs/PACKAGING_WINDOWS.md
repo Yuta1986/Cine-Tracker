@@ -25,8 +25,8 @@ CineTracker/
 
 Runtime resolution policy:
 - The app sets `COLMAP_BIN` and `FFMPEG_BIN` to the bundled `_internal/third_party/bin/*` at startup.
+  - Implementation: `cinetracker.runtime.configure_bundled_binaries()` (also used as a PyInstaller runtime hook).
 
 ## Notes
 - COLMAP Windows CUDA release ships `colmap.exe` and a set of DLLs that must be placed adjacent to it.
 - FFmpeg Windows builds may be static or may require DLLs; bundle them similarly.
-

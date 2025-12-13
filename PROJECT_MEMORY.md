@@ -19,7 +19,8 @@
 | Decision Point | Status | Details |
 | :--- | :--- | :--- |
 | **Sprint 1 Status** | Done | Sprint 1: Foundation & Core COLMAP Integration is Complete. |
-| **Target Sprint** | In Progress | Sprint 3: GUI & Packaging. |
+| **Sprint 3 Status** | Done | Sprint 3: GUI & Packaging is Complete. |
+| **Target Sprint** | In Progress | Sprint 4: UE Integration & Final Testing. |
 | **Completed (this repo)** | Done | `.venv` created; core CLI seeded (`cinetracker`); `cinetracker doctor` added; local user-space binaries bootstrapped via `scripts/bootstrap_binaries_linux.sh`. |
 | **Environment (S1.1)** | Done | Work is in `.venv` and verified via `sys.prefix != sys.base_prefix`. |
 | **Binary Resolution (S1.1)** | Done | `ffmpeg` and CUDA-enabled `colmap.exe` are callable via `subprocess.run()` using `third_party/bin/*` fallback or `COLMAP_BIN` / `FFMPEG_BIN`. |
@@ -31,7 +32,9 @@
 | **S2.3 (Fixed Intrinsics Validation)** | Done | Ran F-02 validation on 50 images with injected OPENCV intrinsics; output `cameras.bin` matches injected params exactly (max abs diff 0.0). |
 | **S2.4 (Alembic + UE Basis)** | Done (code/design) | Implemented pose inversion (`T_{W→C}`→`T_{C→W}`) and a fixed `M_{COLMAP→UE}` basis transform; documented PyAlembic writing calls for time-sampled world matrices. |
 | **S2.4 Basis Matrix** | Defined | `M_{COLMAP→UE} = [[1,0,0,0],[0,0,1,0],[0,-1,0,0],[0,0,0,1]]` mapping OpenCV/COLMAP camera axes (x right, y down, z forward) to UE world axes (X right, Y forward, Z up). |
-| **Next Action** | Pending | Execute **S3.1 / S3.2**: finalize PySide6 layout and wire non-blocking COLMAP pipeline execution + progress streaming. |
+| **Completed (S3.1/S3.2)** | Done | PySide6 UI skeleton + QThread signal/slot worker for non-blocking subprocess execution + log/progress streaming. |
+| **Completed (S3.3/S3.4)** | Done | Packaging plan + PyInstaller spec + runtime bootstrap that sets `COLMAP_BIN` / `FFMPEG_BIN` from bundled `third_party/bin` at startup. |
+| **Next Action** | Pending | Execute **S4.1 / S4.2**: UE Python scripts (Lens File asset creation from JSON + Alembic import/binding to Cine Camera + Level Sequence). |
 | **I/O Logic** | Defined | COLMAP poses ($T_{W \\to C}$) must be inverted for UE/Alembic ($T_{C \\to W}$). |
 
 ---

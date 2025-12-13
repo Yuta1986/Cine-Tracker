@@ -55,7 +55,7 @@ a = Analysis(
     hiddenimports=["PySide6", "numpy"],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[str(ROOT / "packaging" / "pyinstaller_runtime_hook.py")],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -79,4 +79,3 @@ exe = EXE(
     upx=False,
     console=True,
 )
-
