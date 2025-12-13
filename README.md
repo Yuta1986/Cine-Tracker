@@ -53,6 +53,7 @@ From a Windows terminal in the repo root:
 - Build single-file exe only (all-in-one): `build_windows.bat --onefile`
 - Choose output folder in Explorer: `build_windows.bat --choose-out`
 - Explicit output folder: `build_windows.bat --out "D:\\Apps\\CineTracker" --fetch-colmap`
+- Guided (recommended for beginners): `build_windows_easy.bat`
 
 Windows builds use a separate venv folder: `.venv-win` (so it doesn’t conflict with the Linux/WSL `.venv`).
 

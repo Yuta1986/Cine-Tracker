@@ -56,6 +56,8 @@ class MainWindow(QMainWindow):
         self.f01_browse = QPushButton("Browse")
         self.f01_browse.clicked.connect(lambda: self._browse_file(self.f01_video))
         self.f01_out = QLineEdit("output/f01")
+        self.f01_out_browse = QPushButton("Browse")
+        self.f01_out_browse.clicked.connect(lambda: self._browse_dir(self.f01_out))
         self.f01_run = QPushButton("Run F-01 (Calibration)")
         self.f01_run.clicked.connect(self._run_f01)
 
@@ -77,6 +79,8 @@ class MainWindow(QMainWindow):
         self.profile_save.clicked.connect(self._save_profile_from_json)
 
         self.f02_out = QLineEdit("output/f02")
+        self.f02_out_browse = QPushButton("Browse")
+        self.f02_out_browse.clicked.connect(lambda: self._browse_dir(self.f02_out))
         self.f02_run = QPushButton("Run F-02 (Tracking)")
         self.f02_run.clicked.connect(self._run_f02)
 
@@ -118,7 +122,10 @@ class MainWindow(QMainWindow):
         row1.addWidget(self.f01_video, 1)
         row1.addWidget(self.f01_browse)
         form.addRow("Video", row1)
-        form.addRow("Output Dir", self.f01_out)
+        row_out = QHBoxLayout()
+        row_out.addWidget(self.f01_out, 1)
+        row_out.addWidget(self.f01_out_browse)
+        form.addRow("Output Dir", row_out)
         form.addRow(self.f01_run)
         box.setLayout(form)
         return box
@@ -142,7 +149,10 @@ class MainWindow(QMainWindow):
         row2.addWidget(self.f02_lens_json, 1)
         row2.addWidget(self.f02_lens_browse)
         form.addRow("Lens JSON", row2)
-        form.addRow("Output Dir", self.f02_out)
+        row_out = QHBoxLayout()
+        row_out.addWidget(self.f02_out, 1)
+        row_out.addWidget(self.f02_out_browse)
+        form.addRow("Output Dir", row_out)
         form.addRow(self.f02_run)
         box.setLayout(form)
         return box
@@ -166,6 +176,12 @@ class MainWindow(QMainWindow):
 
     def _browse_file(self, line_edit: QLineEdit, filter_str: str = "All Files (*)") -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Select file", filter=filter_str)
+        if path:
+            line_edit.setText(path)
+
+    def _browse_dir(self, line_edit: QLineEdit) -> None:
+        start = line_edit.text().strip() or str(Path.cwd())
+        path = QFileDialog.getExistingDirectory(self, "Select output directory", start)
         if path:
             line_edit.setText(path)
 

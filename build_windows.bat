@@ -15,6 +15,8 @@ set "FETCH_COLMAP=0"
 set "FORCE=0"
 set "OUT_DIR=dist\\windows"
 set "MODE=both"
+set "MENU=0"
+set "PAUSE_ON_EXIT=0"
 
 set "SCRIPT_DIR=%~dp0"
 if "%SCRIPT_DIR:~0,2%"=="\\\\" (
@@ -31,6 +33,9 @@ if /I "%~1"=="--force" ( set "FORCE=1" & shift & goto parse_args )
 if /I "%~1"=="--onedir" ( set "MODE=onedir" & shift & goto parse_args )
 if /I "%~1"=="--onefile" ( set "MODE=onefile" & shift & goto parse_args )
 if /I "%~1"=="--both" ( set "MODE=both" & shift & goto parse_args )
+if /I "%~1"=="--menu" ( set "MENU=1" & set "PAUSE_ON_EXIT=1" & shift & goto parse_args )
+if /I "%~1"=="--pause" ( set "PAUSE_ON_EXIT=1" & shift & goto parse_args )
+if /I "%~1"=="--no-pause" ( set "PAUSE_ON_EXIT=0" & shift & goto parse_args )
 
 if /I "%~1"=="--out" (
   if "%~2"=="" (
@@ -92,6 +97,11 @@ where python >nul 2>nul
 if errorlevel 1 (
   echo Python not found on PATH. Install Python 3.10+ and try again.
   exit /b 1
+)
+
+if "%MENU%"=="1" (
+  call :menu
+  if errorlevel 1 exit /b 1
 )
 
 if not exist "%PY%" (
@@ -182,7 +192,30 @@ echo Opening output folder...
 explorer "%OUT_DIR%" >nul 2>nul
 echo.
 popd
+if "%PAUSE_ON_EXIT%"=="1" pause
 exit /b 0
+
+:menu
+echo.
+echo Cine-Tracker Windows build (guided)
+echo ---------------------------------
+echo.
+echo Choose build type:
+choice /C 123 /M "[1] both  [2] onedir  [3] onefile"
+if errorlevel 3 set "MODE=onefile"
+if errorlevel 2 set "MODE=onedir"
+if errorlevel 1 set "MODE=both"
+
+echo.
+choice /C YN /M "Download COLMAP Windows CUDA build into third_party\\bin? (recommended)"
+if errorlevel 2 set "FETCH_COLMAP=0"
+if errorlevel 1 set "FETCH_COLMAP=1"
+
+echo.
+choice /C YN /M "Choose output folder in Explorer?"
+if errorlevel 2 exit /b 0
+call :choose_out
+exit /b %errorlevel%
 
 :choose_out
 for /f "usebackq delims=" %%I in (`
@@ -194,16 +227,18 @@ exit /b 0
 :usage
 echo.
 echo Usage:
-echo   build_windows.bat [--fetch-colmap] [--force] [--onedir^|--onefile] [--out PATH ^| --choose-out]
+echo   build_windows.bat [--menu] [--fetch-colmap] [--force] [--onedir^|--onefile] [--out PATH ^| --choose-out] [--pause]
 echo   (default: builds both onedir + onefile)
 echo.
 echo Options:
+echo   --menu           Guided prompts (good for beginners)
 echo   --fetch-colmap   Download latest COLMAP Windows CUDA build into third_party\\bin
 echo   --force          Redownload/overwrite when fetching COLMAP
 echo   --onedir         Build folder-based app only
 echo   --onefile        Build single all-in-one exe only
 echo   --out PATH       Set output folder root (supports spaces, default: dist\\windows)
 echo   --choose-out     Pick output folder via Windows folder dialog
+echo   --pause          Keep the window open at the end
 echo.
 popd
 exit /b 2
