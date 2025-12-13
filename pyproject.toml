@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cine-tracker"
+version = "0.0.0"
+description = "OSS Cine-Tracker: COLMAP-based calibration + tracking pipeline for UE camera import."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+core = ["numpy>=1.24"]
+ui = ["PySide6>=6.5"]
+io = ["numpy>=1.24"]
+
+[project.scripts]
+cinetracker = "cinetracker.cli:main"
+cinetracker-gui = "cinetracker.ui.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
