@@ -5,12 +5,23 @@
 from __future__ import annotations
 
 import os
+import platform
 from pathlib import Path
 
-
-ROOT = Path(__file__).resolve().parents[1]
+# NOTE: PyInstaller executes spec files in a custom namespace where `__file__`
+# may not be defined. `SPECPATH` points to the directory containing this spec.
+ROOT = Path(SPECPATH).resolve().parent
 SRC = ROOT / "src"
 ENTRY = SRC / "cinetracker" / "ui" / "main.py"
+
+_sys = platform.system().lower()
+_default_name = "CineTracker"
+if _sys.startswith("windows"):
+    _default_name = "Windows_CineTracker"
+elif _sys.startswith("linux"):
+    _default_name = "Linux_CineTracker"
+
+APP_NAME = os.environ.get("CINETRACKER_APP_NAME", _default_name)
 
 TP_BIN = ROOT / "third_party" / "bin"
 COLMAP_EXE = TP_BIN / "colmap.exe"
@@ -72,10 +83,10 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name="CineTracker",
+    name=APP_NAME,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,
+    console=False,
 )

@@ -2,7 +2,7 @@
 
 ## Environment
 - UE version is **5.7** (target) and required plugins are enabled (Camera Calibration/Lens Distortion, Alembic Importer, Sequencer).
-- Windows build contains `CineTracker.exe` and bundled binaries in `_internal/third_party/bin`.
+- Windows build contains `Windows_CineTracker.exe` and bundled binaries in `_internal/third_party/bin`.
 
 ## Calibration Mode (F-01)
 - Select chessboard video; run completes without UI freeze.
@@ -23,4 +23,3 @@
 ## Error Handling
 - Missing binaries show actionable error message.
 - Bad inputs (missing JSON / invalid video) show clear UI errors and do not crash.
-

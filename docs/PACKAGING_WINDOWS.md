@@ -10,7 +10,7 @@ When built with PyInstaller (one-folder mode):
 
 ```
 CineTracker/
-  CineTracker.exe
+  Windows_CineTracker.exe
   _internal/
     cinetracker/                (our python package)
     PySide6/                    (Qt)

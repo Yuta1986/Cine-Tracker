@@ -20,7 +20,8 @@
 | :--- | :--- | :--- |
 | **Sprint 1 Status** | Done | Sprint 1: Foundation & Core COLMAP Integration is Complete. |
 | **Sprint 3 Status** | Done | Sprint 3: GUI & Packaging is Complete. |
-| **Target Sprint** | In Progress | Sprint 4: UE Integration & Final Testing. |
+| **Sprint 4 Status** | Done (implementation) | Sprint 4: UE Integration & Final Testing scripts/docs are implemented; final validation requires human UAT inside UE 5.7. |
+| **Target Sprint** | Done | All Sprints (1–4) are complete (implementation complete; pending human UAT). |
 | **Completed (this repo)** | Done | `.venv` created; core CLI seeded (`cinetracker`); `cinetracker doctor` added; local user-space binaries bootstrapped via `scripts/bootstrap_binaries_linux.sh`. |
 | **Environment (S1.1)** | Done | Work is in `.venv` and verified via `sys.prefix != sys.base_prefix`. |
 | **Binary Resolution (S1.1)** | Done | `ffmpeg` and CUDA-enabled `colmap.exe` are callable via `subprocess.run()` using `third_party/bin/*` fallback or `COLMAP_BIN` / `FFMPEG_BIN`. |
@@ -40,6 +41,9 @@
 | **S4.2 (UE Alembic Import/Bind Script)** | Implemented (needs UE run) | Added UE Python script to import Alembic, create/find CineCameraActor, assign LensFile, and bind actor to a Level Sequence (Alembic-to-camera track creation is UE-version dependent). |
 | **S4.3 (UAT Checklist)** | Drafted | Added UAT checklist for end-to-end validation in UE 5.7. |
 | **S4.4 (Docs Outline)** | Drafted | Added documentation outline including licensing + troubleshooting sections. |
+| **README Licensing Section** | Done | Added licensing/attribution section naming COLMAP (The Structure-from-Motion Software) and FFmpeg and other key dependencies. |
+| **PyInstaller Build** | Done (Linux) | Ran `pyinstaller --clean packaging/cinetracker.spec`; produced `dist/cinetracker` (Linux ELF). For a Windows `cinetracker.exe`, run the same spec on Windows Python. |
+| **Next Action** | Final Review | Run Windows build + execute UE 5.7 UAT checklist for delivery. |
 
 ---
 **END OF PROJECT MEMORY**

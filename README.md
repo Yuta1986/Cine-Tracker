@@ -32,3 +32,31 @@ Local dev seeds:
 - Intrinsics injection into COLMAP `database.db`: `cinetracker inject-intrinsics --database path/to/database.db --json lens_calibration_data.json --dry-run`
 - Environment check (binaries + versions): `cinetracker doctor --check-gpu`
 - Inspect COLMAP outputs: `cinetracker inspect-model --model path/to/sparse/0`
+
+## Windows build (PyInstaller)
+
+Windows executables must be built on Windows (PyInstaller does not cross-compile).
+
+From a Windows terminal in the repo root:
+- Build (optionally fetch COLMAP): `build_windows.bat --fetch-colmap`
+- Build (no downloads): `build_windows.bat`
+
+Output:
+- Windows: `dist\\windows\\Windows_CineTracker\\Windows_CineTracker.exe`
+- Linux (if you run PyInstaller on Linux): `dist\\linux\\Linux_CineTracker\\Linux_CineTracker` (no `.exe`)
+
+Override the output name (optional):
+- Set `CINETRACKER_APP_NAME` before running PyInstaller (or `build_windows.bat`).
+
+## Licensing and attributions
+
+This project incorporates and/or interoperates with the following third‑party software. Their license terms must be respected:
+
+- **COLMAP (The Structure-from-Motion Software)** — BSD 3‑Clause License. Source: https://github.com/colmap/colmap
+- **FFmpeg** — licensed under LGPL v2.1 or later, with optional GPL components depending on how FFmpeg is built. Site: https://ffmpeg.org/
+- **PySide6 / Qt for Python (Qt)** — LGPL v3. Source: https://www.qt.io/qt-for-python
+- **NumPy** — BSD 3‑Clause License. Source: https://numpy.org/
+- **PyInstaller** (packaging) — GPL with an exception for distributing bundled applications. Source: https://pyinstaller.org/
+
+Notes:
+- If you redistribute this application with bundled binaries (e.g., `colmap.exe`, `ffmpeg.exe`), you must also redistribute the corresponding license notices and comply with each license’s distribution requirements (e.g., LGPL/GPL obligations for FFmpeg builds).
