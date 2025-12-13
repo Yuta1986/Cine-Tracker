@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QComboBox,
     QPushButton,
     QProgressBar,
     QTextEdit,
@@ -18,9 +19,12 @@ from PySide6.QtWidgets import (
     QWidget,
     QFileDialog,
     QMainWindow,
+    QInputDialog,
+    QMessageBox,
 )
 
 from cinetracker.core.colmap_cli import COLMAP
+from cinetracker.core.lens_profiles import add_profile, list_profiles, resolve_profile_json
 from cinetracker.ui.worker import PipelineWorker, ProcessSpec, WorkerThread
 
 
@@ -63,6 +67,15 @@ class MainWindow(QMainWindow):
         self.f02_lens_json.setPlaceholderText("lens_calibration_data.json (required)")
         self.f02_lens_browse = QPushButton("Browse")
         self.f02_lens_browse.clicked.connect(lambda: self._browse_file(self.f02_lens_json, filter_str="JSON (*.json)"))
+
+        self.profile_combo = QComboBox()
+        self.profile_refresh = QPushButton("Refresh")
+        self.profile_refresh.clicked.connect(self._refresh_profiles)
+        self.profile_use = QPushButton("Use")
+        self.profile_use.clicked.connect(self._use_selected_profile)
+        self.profile_save = QPushButton("Save…")
+        self.profile_save.clicked.connect(self._save_profile_from_json)
+
         self.f02_out = QLineEdit("output/f02")
         self.f02_run = QPushButton("Run F-02 (Tracking)")
         self.f02_run.clicked.connect(self._run_f02)
@@ -86,6 +99,8 @@ class MainWindow(QMainWindow):
 
         root.addWidget(self._build_output_box(), 2)
         central.setLayout(root)
+
+        self._refresh_profiles()
 
     def _build_paths_box(self) -> QGroupBox:
         box = QGroupBox("Binaries")
@@ -115,6 +130,14 @@ class MainWindow(QMainWindow):
         row1.addWidget(self.f02_video, 1)
         row1.addWidget(self.f02_browse)
         form.addRow("Video", row1)
+
+        prow = QHBoxLayout()
+        prow.addWidget(self.profile_combo, 1)
+        prow.addWidget(self.profile_use)
+        prow.addWidget(self.profile_refresh)
+        prow.addWidget(self.profile_save)
+        form.addRow("Lens Profile", prow)
+
         row2 = QHBoxLayout()
         row2.addWidget(self.f02_lens_json, 1)
         row2.addWidget(self.f02_lens_browse)
@@ -145,6 +168,71 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Select file", filter=filter_str)
         if path:
             line_edit.setText(path)
+
+    def _refresh_profiles(self) -> None:
+        try:
+            profiles = list_profiles()
+        except Exception as e:
+            QMessageBox.warning(self, "Lens Profiles", f"Failed to list profiles:\n{e}")
+            profiles = []
+
+        self.profile_combo.clear()
+        if not profiles:
+            self.profile_combo.addItem("(no saved profiles)", None)
+            self.profile_use.setEnabled(False)
+            return
+
+        for prof in profiles:
+            dims = (
+                f"{prof.image_width}x{prof.image_height}"
+                if prof.image_width is not None and prof.image_height is not None
+                else "?"
+            )
+            model = prof.camera_model or "?"
+            label = f"{prof.name}  ({model}, {dims})"
+            self.profile_combo.addItem(label, prof.name)
+        self.profile_use.setEnabled(True)
+
+    def _use_selected_profile(self) -> None:
+        name = self.profile_combo.currentData()
+        if not name:
+            return
+        try:
+            p = resolve_profile_json(str(name))
+        except Exception as e:
+            QMessageBox.warning(self, "Lens Profiles", f"Failed to resolve profile:\n{e}")
+            return
+        self.f02_lens_json.setText(str(p))
+
+    def _save_profile_from_json(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Select lens_calibration_data.json", filter="JSON (*.json)")
+        if not path:
+            return
+        name, ok = QInputDialog.getText(self, "Save Lens Profile", "Profile name:")
+        if not ok:
+            return
+        try:
+            add_profile(name=name, json_path=path, overwrite=False)
+        except FileExistsError:
+            overwrite = QMessageBox.question(
+                self,
+                "Lens Profiles",
+                "Profile already exists. Overwrite?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if overwrite != QMessageBox.StandardButton.Yes:
+                return
+            try:
+                add_profile(name=name, json_path=path, overwrite=True)
+            except Exception as e:
+                QMessageBox.warning(self, "Lens Profiles", f"Failed to save profile:\n{e}")
+                return
+        except Exception as e:
+            QMessageBox.warning(self, "Lens Profiles", f"Failed to save profile:\n{e}")
+            return
+
+        QMessageBox.information(self, "Lens Profiles", "Saved.")
+        self._refresh_profiles()
 
     def _append_log(self, text: str) -> None:
         self.log.append(text)
@@ -215,4 +303,3 @@ class MainWindow(QMainWindow):
             ProcessSpec(label="COLMAP (placeholder)", argv=[paths.colmap_bin, "-h"]),
         ]
         self._start_pipeline(specs)
-

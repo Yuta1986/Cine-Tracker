@@ -1,6 +1,7 @@
-# PyInstaller spec (draft) for Cine-Tracker Windows build.
+# PyInstaller spec for Cine-Tracker "onefile" build (single exe).
+#
 # Build example:
-#   pyinstaller --clean --noconfirm packaging/cinetracker.spec
+#   pyinstaller --clean --noconfirm --distpath dist/windows/onefile packaging/cinetracker_onefile.spec
 
 from __future__ import annotations
 
@@ -79,8 +80,10 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
     name=APP_NAME,
     debug=False,
     bootloader_ignore_signals=False,
@@ -89,13 +92,3 @@ exe = EXE(
     console=False,
 )
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    strip=False,
-    upx=False,
-    name=APP_NAME,
-)

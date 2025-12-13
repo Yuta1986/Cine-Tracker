@@ -22,7 +22,9 @@ def main(argv: list[str] | None = None) -> int:
 
     inj = sub.add_parser("inject-intrinsics", help="Inject fixed intrinsics into COLMAP database.db")
     inj.add_argument("--database", required=True, help="Path to COLMAP database.db")
-    inj.add_argument("--json", required=True, help="Path to lens_calibration_data.json")
+    inj_json = inj.add_mutually_exclusive_group(required=True)
+    inj_json.add_argument("--json", help="Path to lens_calibration_data.json")
+    inj_json.add_argument("--profile", help="Lens profile name (see `cinetracker profile list`)")
     inj.add_argument("--camera-id", type=int, default=None, help="Camera ID to update")
     inj.add_argument("--all", action="store_true", help="Update all cameras")
     inj.add_argument("--model", default=None, help="Override JSON camera model (e.g., OPENCV)")
@@ -52,6 +54,23 @@ def main(argv: list[str] | None = None) -> int:
 
     gui = sub.add_parser("gui", help="Start the PySide6 GUI")
 
+    prof = sub.add_parser("profile", help="Manage reusable lens profiles (saved lens_calibration_data.json)")
+    prof_sub = prof.add_subparsers(dest="profile_cmd", required=True)
+
+    prof_add = prof_sub.add_parser("add", help="Save a lens calibration JSON as a named profile")
+    prof_add.add_argument("--name", required=True, help="Profile name (used as filename)")
+    prof_add.add_argument("--json", required=True, help="Path to lens_calibration_data.json")
+    prof_add.add_argument("--overwrite", action="store_true", help="Overwrite if profile exists")
+
+    prof_list = prof_sub.add_parser("list", help="List saved profiles")
+    prof_list.add_argument("--verbose", action="store_true", help="Show more details")
+
+    prof_path = prof_sub.add_parser("path", help="Print the profile JSON path")
+    prof_path.add_argument("--name", required=True)
+
+    prof_rm = prof_sub.add_parser("remove", help="Remove a profile")
+    prof_rm.add_argument("--name", required=True)
+
     args = parser.parse_args(argv)
 
     if args.cmd == "doctor":
@@ -67,9 +86,14 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if args.cmd == "inject-intrinsics":
+        json_path = args.json
+        if not json_path and getattr(args, "profile", None):
+            from cinetracker.core.lens_profiles import resolve_profile_json
+
+            json_path = str(resolve_profile_json(args.profile))
         return inject_intrinsics_into_database(
             database_path=args.database,
-            json_path=args.json,
+            json_path=json_path,
             camera_id=args.camera_id,
             update_all=args.all,
             override_model=args.model,
@@ -113,6 +137,58 @@ def main(argv: list[str] | None = None) -> int:
         from cinetracker.ui.main import main as gui_main
 
         return gui_main()
+
+    if args.cmd == "profile":
+        from cinetracker.core.lens_profiles import add_profile, list_profiles, remove_profile, resolve_profile_json
+
+        if args.profile_cmd == "add":
+            try:
+                p = add_profile(name=args.name, json_path=args.json, overwrite=args.overwrite)
+            except Exception as e:
+                print(f"Failed to add profile: {e}", file=sys.stderr)
+                return 2
+            print(f"Saved profile: {args.name} -> {p}")
+            return 0
+
+        if args.profile_cmd == "list":
+            profiles = list_profiles()
+            if not profiles:
+                print("No profiles found.")
+                return 0
+            for prof in profiles:
+                if args.verbose:
+                    dims = (
+                        f"{prof.image_width}x{prof.image_height}"
+                        if prof.image_width is not None and prof.image_height is not None
+                        else "?"
+                    )
+                    model = prof.camera_model or "?"
+                    created = prof.created_at or "?"
+                    disp = prof.display_name or prof.name
+                    print(f"{prof.name}\t{disp}\t{model}\t{dims}\t{created}")
+                else:
+                    print(prof.name)
+            return 0
+
+        if args.profile_cmd == "path":
+            try:
+                print(resolve_profile_json(args.name))
+            except Exception as e:
+                print(str(e), file=sys.stderr)
+                return 2
+            return 0
+
+        if args.profile_cmd == "remove":
+            try:
+                remove_profile(name=args.name)
+            except Exception as e:
+                print(f"Failed to remove profile: {e}", file=sys.stderr)
+                return 2
+            print(f"Removed profile: {args.name}")
+            return 0
+
+        parser.error(f"Unknown profile command: {args.profile_cmd}")
+        return 2
 
     parser.error(f"Unknown command: {args.cmd}")
     return 2

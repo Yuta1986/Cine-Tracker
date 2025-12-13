@@ -13,6 +13,8 @@ set "PIP=%VENV_DIR%\Scripts\pip.exe"
 set "FETCH_COLMAP=0"
 set "FORCE=0"
 set "DISTPATH=dist\\windows"
+set "BUILD_ONEDIR=1"
+set "BUILD_ONEFILE=1"
 
 set "SCRIPT_DIR=%~dp0"
 if "%SCRIPT_DIR:~0,2%"=="\\\\" (
@@ -26,6 +28,9 @@ if "%SCRIPT_DIR:~0,2%"=="\\\\" (
 if "%~1"=="" goto args_done
 if /I "%~1"=="--fetch-colmap" ( set "FETCH_COLMAP=1" & shift & goto parse_args )
 if /I "%~1"=="--force" ( set "FORCE=1" & shift & goto parse_args )
+if /I "%~1"=="--onedir" ( set "BUILD_ONEDIR=1" & set "BUILD_ONEFILE=0" & shift & goto parse_args )
+if /I "%~1"=="--onefile" ( set "BUILD_ONEDIR=0" & set "BUILD_ONEFILE=1" & shift & goto parse_args )
+if /I "%~1"=="--both" ( set "BUILD_ONEDIR=1" & set "BUILD_ONEFILE=1" & shift & goto parse_args )
 if /I "%~1"=="--distpath" (
   if "%~2"=="" (
     echo Missing value for --distpath
@@ -98,17 +103,27 @@ if not exist "third_party\\bin\\ffprobe.exe" (
 set "APP_NAME=Windows_CineTracker"
 if defined CINETRACKER_APP_NAME set "APP_NAME=%CINETRACKER_APP_NAME%"
 
-echo Building with PyInstaller...
-rem Put Windows builds under dist\windows\... to avoid confusion with Linux artifacts.
-"%VENV_DIR%\\Scripts\\pyinstaller.exe" --clean --noconfirm --distpath "%DISTPATH%" packaging\\cinetracker.spec
-if errorlevel 1 exit /b 1
+set "PYI=%VENV_DIR%\\Scripts\\pyinstaller.exe"
+
+if "%BUILD_ONEDIR%"=="1" (
+  echo Building (onedir) with PyInstaller...
+  "%PYI%" --clean --noconfirm --distpath "%DISTPATH%\\onedir" --workpath "build\\pyinstaller\\onedir" packaging\\cinetracker.spec
+  if errorlevel 1 exit /b 1
+)
+
+if "%BUILD_ONEFILE%"=="1" (
+  echo Building (onefile) with PyInstaller...
+  "%PYI%" --clean --noconfirm --distpath "%DISTPATH%\\onefile" --workpath "build\\pyinstaller\\onefile" packaging\\cinetracker_onefile.spec
+  if errorlevel 1 exit /b 1
+)
 
 echo.
 echo Build complete:
-echo   %DISTPATH%\\%APP_NAME%\\%APP_NAME%.exe
+if "%BUILD_ONEDIR%"=="1" echo   Onedir:  %DISTPATH%\\onedir\\%APP_NAME%\\%APP_NAME%.exe
+if "%BUILD_ONEFILE%"=="1" echo   Onefile: %DISTPATH%\\onefile\\%APP_NAME%.exe
 echo.
 echo Opening output folder...
-explorer "%DISTPATH%\\%APP_NAME%" >nul 2>nul
+explorer "%DISTPATH%" >nul 2>nul
 echo.
 popd
 exit /b 0
@@ -123,11 +138,14 @@ exit /b 0
 :usage
 echo.
 echo Usage:
-echo   build_windows.bat [--fetch-colmap] [--force] [--distpath PATH ^| --choose-dist]
+echo   build_windows.bat [--fetch-colmap] [--force] [--onedir^|--onefile^|--both] [--distpath PATH ^| --choose-dist]
 echo.
 echo Options:
 echo   --fetch-colmap   Download latest COLMAP Windows CUDA build into third_party\\bin
 echo   --force          Redownload/overwrite when fetching COLMAP
+echo   --onedir         Build folder-based app (default: builds both)
+echo   --onefile        Build single all-in-one exe (default: builds both)
+echo   --both           Build both outputs (default)
 echo   --distpath PATH  Set PyInstaller output folder (supports spaces)
 echo   --choose-dist    Pick output folder via Windows folder dialog
 echo.
