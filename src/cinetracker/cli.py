@@ -52,6 +52,27 @@ def main(argv: list[str] | None = None) -> int:
     f02.add_argument("--max-images", type=int, default=50, help="Limit images for faster validation (0 = all)")
     f02.add_argument("--colmap-bin", default=None, help="Explicit path to COLMAP binary (or set COLMAP_BIN)")
 
+    f04 = sub.add_parser(
+        "f04-plumbline-refine",
+        help="F-04 prototype: refine k1/k2 using 2D plumb-line constraints (requires native Ceres extension)",
+    )
+    f04.add_argument("--images", required=True, help="Directory containing extracted frames/images")
+    f04.add_argument("--lens-json", required=True, help="Input lens_calibration_data.json (OPENCV)")
+    f04.add_argument("--out-json", required=True, help="Output lens_calibration_data.json (updated k1/k2)")
+    f04.add_argument("--max-images", type=int, default=30, help="Limit images for faster runs (0 = all)")
+    f04.add_argument("--max-lines-per-image", type=int, default=200, help="Max LSD segments per image")
+    f04.add_argument("--min-line-length", type=float, default=120.0, help="Minimum line length in pixels")
+    f04.add_argument("--sample-step", type=float, default=8.0, help="Sample step along line segments in pixels")
+    f04.add_argument("--outer-iters", type=int, default=6, help="Outer iterations (fit lines -> Ceres step)")
+    f04.add_argument(
+        "--median-reproj-px",
+        type=float,
+        default=1.0,
+        help="Approx median reprojection error in pixels (used to scale lambda_line)",
+    )
+    f04.add_argument("--lambda-cap", type=float, default=5.0, help="Max lambda_line")
+    f04.add_argument("--cauchy-scale", type=float, default=2.0, help="Cauchy robust loss scale in pixels")
+
     gui = sub.add_parser("gui", help="Start the PySide6 GUI")
 
     prof = sub.add_parser("profile", help="Manage reusable lens profiles (saved lens_calibration_data.json)")
@@ -132,6 +153,81 @@ def main(argv: list[str] | None = None) -> int:
             out=sys.stdout,
             err=sys.stderr,
         )
+
+    if args.cmd == "f04-plumbline-refine":
+        from cinetracker.core.colmap_db import load_intrinsics_spec
+        from cinetracker.core.f04_plumbline import build_plumbline_input_from_images, refine_k1k2_plumbline_only
+        from cinetracker.core.lens_json import write_lens_calibration_json
+
+        spec = load_intrinsics_spec(args.lens_json, override_model="OPENCV")
+        if spec.image_width is None or spec.image_height is None:
+            print("lens-json must include image_width and image_height for F-04.", file=sys.stderr)
+            return 2
+        need = ["fx", "fy", "cx", "cy", "k1", "k2"]
+        missing = [k for k in need if k not in spec.params_by_name]
+        if missing:
+            print(f"lens-json missing required keys: {', '.join(missing)}", file=sys.stderr)
+            return 2
+
+        pl = build_plumbline_input_from_images(
+            images_dir=args.images,
+            fx=spec.params_by_name["fx"],
+            fy=spec.params_by_name["fy"],
+            cx=spec.params_by_name["cx"],
+            cy=spec.params_by_name["cy"],
+            k1=spec.params_by_name["k1"],
+            k2=spec.params_by_name["k2"],
+            max_images=args.max_images,
+            max_lines_per_image=args.max_lines_per_image,
+            min_line_length_px=args.min_line_length,
+            sample_step_px=args.sample_step,
+            out=sys.stdout,
+        )
+
+        k1, k2, metrics = refine_k1k2_plumbline_only(
+            pl,
+            outer_iters=args.outer_iters,
+            median_reproj_px=args.median_reproj_px,
+            lambda_cap=args.lambda_cap,
+            cauchy_scale_px=args.cauchy_scale,
+            out=sys.stdout,
+        )
+
+        out_dict = {
+            "version": 1,
+            "camera_model": "OPENCV",
+            "image_width": int(spec.image_width),
+            "image_height": int(spec.image_height),
+            "fx": float(spec.params_by_name["fx"]),
+            "fy": float(spec.params_by_name["fy"]),
+            "cx": float(spec.params_by_name["cx"]),
+            "cy": float(spec.params_by_name["cy"]),
+            "k1": float(k1),
+            "k2": float(k2),
+            "p1": float(spec.params_by_name.get("p1", 0.0)),
+            "p2": float(spec.params_by_name.get("p2", 0.0)),
+            "f04_plumbline": {
+                "outer_iters": int(args.outer_iters),
+                "cauchy_scale_px": float(args.cauchy_scale),
+                "lambda_cap": float(args.lambda_cap),
+                "median_reproj_px": float(args.median_reproj_px),
+                "num_samples": int(pl.sample_uv.shape[0]),
+                "num_lines": int(pl.num_lines),
+                "metrics": [
+                    {
+                        "outer_iter": int(m.outer_iter),
+                        "k1": float(m.k1),
+                        "k2": float(m.k2),
+                        "median_line_px": float(m.median_line_px),
+                        "lambda_line": float(m.lambda_line),
+                    }
+                    for m in metrics
+                ],
+            },
+        }
+        write_lens_calibration_json(out_dict, args.out_json)
+        print(f"[f04] wrote: {args.out_json}")
+        return 0
 
     if args.cmd == "gui":
         from cinetracker.ui.main import main as gui_main

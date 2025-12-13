@@ -3,6 +3,7 @@
 Target: ship a standalone Windows executable bundling:
 - Python + our `cinetracker` package
 - External binaries: `colmap.exe` (+ required DLLs) and `ffmpeg.exe` (+ DLLs if needed)
+ - (Future F-04) optional native extension: `cinetracker_native.pyd` (Ceres + pybind11)
 
 ## Proposed packaged directory layout
 
