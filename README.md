@@ -51,8 +51,8 @@ From a Windows terminal in the repo root:
 - Build both outputs (no downloads): `build_windows.bat`
 - Build folder-based app only (faster startup): `build_windows.bat --onedir`
 - Build single-file exe only (all-in-one): `build_windows.bat --onefile`
-- Choose output folder in Explorer: `build_windows.bat --choose-dist`
-- Explicit output folder: `build_windows.bat --distpath "D:\\Apps\\CineTracker" --fetch-colmap`
+- Choose output folder in Explorer: `build_windows.bat --choose-out`
+- Explicit output folder: `build_windows.bat --out "D:\\Apps\\CineTracker" --fetch-colmap`
 
 Windows builds use a separate venv folder: `.venv-win` (so it doesn’t conflict with the Linux/WSL `.venv`).
 

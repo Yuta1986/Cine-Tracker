@@ -2,19 +2,19 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 rem Cine-Tracker Windows build helper (PyInstaller).
-rem Produces: dist\CineTracker\CineTracker.exe
+rem Produces:
+rem   Onedir:  dist\windows\onedir\Windows_CineTracker\Windows_CineTracker.exe
+rem   Onefile: dist\windows\onefile\Windows_CineTracker.exe
 
 pushd "%~dp0"
 
 set "VENV_DIR=.venv-win"
 set "PY=%VENV_DIR%\Scripts\python.exe"
-set "PIP=%VENV_DIR%\Scripts\pip.exe"
 
 set "FETCH_COLMAP=0"
 set "FORCE=0"
-set "DISTPATH=dist\\windows"
-set "BUILD_ONEDIR=1"
-set "BUILD_ONEFILE=1"
+set "OUT_DIR=dist\\windows"
+set "MODE=both"
 
 set "SCRIPT_DIR=%~dp0"
 if "%SCRIPT_DIR:~0,2%"=="\\\\" (
@@ -28,29 +28,63 @@ if "%SCRIPT_DIR:~0,2%"=="\\\\" (
 if "%~1"=="" goto args_done
 if /I "%~1"=="--fetch-colmap" ( set "FETCH_COLMAP=1" & shift & goto parse_args )
 if /I "%~1"=="--force" ( set "FORCE=1" & shift & goto parse_args )
-if /I "%~1"=="--onedir" ( set "BUILD_ONEDIR=1" & set "BUILD_ONEFILE=0" & shift & goto parse_args )
-if /I "%~1"=="--onefile" ( set "BUILD_ONEDIR=0" & set "BUILD_ONEFILE=1" & shift & goto parse_args )
-if /I "%~1"=="--both" ( set "BUILD_ONEDIR=1" & set "BUILD_ONEFILE=1" & shift & goto parse_args )
-if /I "%~1"=="--distpath" (
+if /I "%~1"=="--onedir" ( set "MODE=onedir" & shift & goto parse_args )
+if /I "%~1"=="--onefile" ( set "MODE=onefile" & shift & goto parse_args )
+if /I "%~1"=="--both" ( set "MODE=both" & shift & goto parse_args )
+
+if /I "%~1"=="--out" (
   if "%~2"=="" (
-    echo Missing value for --distpath
+    echo Missing value for --out
     goto usage
   )
-  set "DISTPATH=%~2"
+  if "%~2:~0,2%"=="--" (
+    echo Missing value for --out
+    goto usage
+  )
+  set "OUT_DIR=%~2"
   shift
   shift
   goto parse_args
 )
-if /I "%~1"=="--choose-dist" (
-  call :choose_dist
+if /I "%~1"=="--choose-out" (
+  call :choose_out
   if errorlevel 1 exit /b 1
   shift
   goto parse_args
 )
+
+rem Back-compat aliases:
+if /I "%~1"=="--distpath" ( shift & set "_ARG=--out" & goto parse_args_rewrite )
+if /I "%~1"=="--choose-dist" ( shift & set "_ARG=--choose-out" & goto parse_args_rewrite )
+
 if /I "%~1"=="--help" goto usage
 if /I "%~1"=="/?" goto usage
 echo Unknown argument: %~1
 goto usage
+
+:parse_args_rewrite
+if "%_ARG%"=="--out" (
+  if "%~1"=="" (
+    echo Missing value for --out
+    goto usage
+  )
+  if "%~1:~0,2%"=="--" (
+    echo Missing value for --out
+    goto usage
+  )
+  set "OUT_DIR=%~1"
+  set "_ARG="
+  shift
+  goto parse_args
+)
+if "%_ARG%"=="--choose-out" (
+  set "_ARG="
+  call :choose_out
+  if errorlevel 1 exit /b 1
+  goto parse_args
+)
+set "_ARG="
+goto parse_args
 
 :args_done
 
@@ -105,49 +139,71 @@ if defined CINETRACKER_APP_NAME set "APP_NAME=%CINETRACKER_APP_NAME%"
 
 set "PYI=%VENV_DIR%\\Scripts\\pyinstaller.exe"
 
-if "%BUILD_ONEDIR%"=="1" (
+if /I "%MODE%"=="onedir" set "MODE=onedir"
+if /I "%MODE%"=="onefile" set "MODE=onefile"
+if /I "%MODE%"=="both" set "MODE=both"
+
+if "%MODE%"=="onedir" goto do_onedir
+if "%MODE%"=="onefile" goto do_onefile
+if "%MODE%"=="both" goto do_both
+echo Invalid build mode: %MODE%
+goto usage
+
+:do_onedir
   echo Building (onedir) with PyInstaller...
-  "%PYI%" --clean --noconfirm --distpath "%DISTPATH%\\onedir" --workpath "build\\pyinstaller\\onedir" packaging\\cinetracker.spec
+  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\\onedir" --workpath "build\\pyinstaller\\onedir" packaging\\cinetracker.spec
   if errorlevel 1 exit /b 1
-)
+  goto done_build
 
-if "%BUILD_ONEFILE%"=="1" (
+:do_onefile
   echo Building (onefile) with PyInstaller...
-  "%PYI%" --clean --noconfirm --distpath "%DISTPATH%\\onefile" --workpath "build\\pyinstaller\\onefile" packaging\\cinetracker_onefile.spec
+  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\\onefile" --workpath "build\\pyinstaller\\onefile" packaging\\cinetracker_onefile.spec
   if errorlevel 1 exit /b 1
-)
+  goto done_build
 
+:do_both
+  echo Building (onedir) with PyInstaller...
+  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\\onedir" --workpath "build\\pyinstaller\\onedir" packaging\\cinetracker.spec
+  if errorlevel 1 exit /b 1
+  echo Building (onefile) with PyInstaller...
+  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\\onefile" --workpath "build\\pyinstaller\\onefile" packaging\\cinetracker_onefile.spec
+  if errorlevel 1 exit /b 1
+  goto done_build
+
+:done_build
 echo.
 echo Build complete:
-if "%BUILD_ONEDIR%"=="1" echo   Onedir:  %DISTPATH%\\onedir\\%APP_NAME%\\%APP_NAME%.exe
-if "%BUILD_ONEFILE%"=="1" echo   Onefile: %DISTPATH%\\onefile\\%APP_NAME%.exe
+if "%MODE%"=="onedir" echo   Onedir:  %OUT_DIR%\\onedir\\%APP_NAME%\\%APP_NAME%.exe
+if "%MODE%"=="onefile" echo   Onefile: %OUT_DIR%\\onefile\\%APP_NAME%.exe
+if "%MODE%"=="both" echo   Onedir:  %OUT_DIR%\\onedir\\%APP_NAME%\\%APP_NAME%.exe
+if "%MODE%"=="both" echo   Onefile: %OUT_DIR%\\onefile\\%APP_NAME%.exe
 echo.
 echo Opening output folder...
-explorer "%DISTPATH%" >nul 2>nul
+explorer "%OUT_DIR%" >nul 2>nul
 echo.
 popd
 exit /b 0
 
-:choose_dist
+:choose_out
 for /f "usebackq delims=" %%I in (`
-  powershell -NoProfile -STA -Command "Add-Type -AssemblyName System.Windows.Forms; $d=New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description='Select output folder for dist'; if($d.ShowDialog() -ne 'OK'){ exit 1 }; [Console]::WriteLine($d.SelectedPath)"
-`) do set "DISTPATH=%%I"
-if not defined DISTPATH exit /b 1
+  powershell -NoProfile -STA -Command "Add-Type -AssemblyName System.Windows.Forms; $d=New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description='Select output folder'; if($d.ShowDialog() -ne 'OK'){ exit 1 }; [Console]::WriteLine($d.SelectedPath)"
+`) do set "OUT_DIR=%%I"
+if not defined OUT_DIR exit /b 1
 exit /b 0
 
 :usage
 echo.
 echo Usage:
-echo   build_windows.bat [--fetch-colmap] [--force] [--onedir^|--onefile^|--both] [--distpath PATH ^| --choose-dist]
+echo   build_windows.bat [--fetch-colmap] [--force] [--onedir^|--onefile] [--out PATH ^| --choose-out]
+echo   (default: builds both onedir + onefile)
 echo.
 echo Options:
 echo   --fetch-colmap   Download latest COLMAP Windows CUDA build into third_party\\bin
 echo   --force          Redownload/overwrite when fetching COLMAP
-echo   --onedir         Build folder-based app (default: builds both)
-echo   --onefile        Build single all-in-one exe (default: builds both)
-echo   --both           Build both outputs (default)
-echo   --distpath PATH  Set PyInstaller output folder (supports spaces)
-echo   --choose-dist    Pick output folder via Windows folder dialog
+echo   --onedir         Build folder-based app only
+echo   --onefile        Build single all-in-one exe only
+echo   --out PATH       Set output folder root (supports spaces, default: dist\\windows)
+echo   --choose-out     Pick output folder via Windows folder dialog
 echo.
 popd
 exit /b 2
