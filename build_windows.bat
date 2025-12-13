@@ -12,6 +12,7 @@ set "VENV_DIR=.venv-win"
 set "PY=%VENV_DIR%\Scripts\python.exe"
 
 set "FETCH_COLMAP=0"
+set "FETCH_FFMPEG=0"
 set "FORCE=0"
 set "OUT_DIR=dist\\windows"
 set "MODE=both"
@@ -29,6 +30,7 @@ if "%SCRIPT_DIR:~0,2%"=="\\\\" (
 :parse_args
 if "%~1"=="" goto args_done
 if /I "%~1"=="--fetch-colmap" ( set "FETCH_COLMAP=1" & shift & goto parse_args )
+if /I "%~1"=="--fetch-ffmpeg" ( set "FETCH_FFMPEG=1" & shift & goto parse_args )
 if /I "%~1"=="--force" ( set "FORCE=1" & shift & goto parse_args )
 if /I "%~1"=="--onedir" ( set "MODE=onedir" & shift & goto parse_args )
 if /I "%~1"=="--onefile" ( set "MODE=onefile" & shift & goto parse_args )
@@ -133,12 +135,23 @@ if "%FETCH_COLMAP%"=="1" (
   if errorlevel 1 exit /b 1
 )
 
+if "%FETCH_FFMPEG%"=="1" (
+  echo Fetching FFmpeg Windows build into third_party\bin ...
+  if "%FORCE%"=="1" (
+    "%PY%" scripts\fetch_ffmpeg_windows.py --force
+  ) else (
+    "%PY%" scripts\fetch_ffmpeg_windows.py
+  )
+  if errorlevel 1 exit /b 1
+)
+
 if not exist "third_party\\bin\\colmap.exe" (
   echo WARN: third_party\bin\colmap.exe not found. It will NOT be bundled.
   echo       Use: build_windows.bat --fetch-colmap
 )
 if not exist "third_party\\bin\\ffmpeg.exe" (
   echo WARN: third_party\bin\ffmpeg.exe not found. It will NOT be bundled.
+  echo       Use: build_windows.bat --fetch-ffmpeg
 )
 if not exist "third_party\\bin\\ffprobe.exe" (
   echo WARN: third_party\bin\ffprobe.exe not found. It will NOT be bundled.
@@ -212,6 +225,11 @@ if errorlevel 2 set "FETCH_COLMAP=0"
 if errorlevel 1 set "FETCH_COLMAP=1"
 
 echo.
+choice /C YN /M "Download FFmpeg Windows build into third_party\\bin? (recommended)"
+if errorlevel 2 set "FETCH_FFMPEG=0"
+if errorlevel 1 set "FETCH_FFMPEG=1"
+
+echo.
 choice /C YN /M "Choose output folder in Explorer?"
 if errorlevel 2 exit /b 0
 call :choose_out
@@ -227,13 +245,14 @@ exit /b 0
 :usage
 echo.
 echo Usage:
-echo   build_windows.bat [--menu] [--fetch-colmap] [--force] [--onedir^|--onefile] [--out PATH ^| --choose-out] [--pause]
+echo   build_windows.bat [--menu] [--fetch-colmap] [--fetch-ffmpeg] [--force] [--onedir^|--onefile] [--out PATH ^| --choose-out] [--pause]
 echo   (default: builds both onedir + onefile)
 echo.
 echo Options:
 echo   --menu           Guided prompts (good for beginners)
 echo   --fetch-colmap   Download latest COLMAP Windows CUDA build into third_party\\bin
-echo   --force          Redownload/overwrite when fetching COLMAP
+echo   --fetch-ffmpeg   Download latest FFmpeg Windows build into third_party\\bin
+echo   --force          Redownload/overwrite when fetching binaries
 echo   --onedir         Build folder-based app only
 echo   --onefile        Build single all-in-one exe only
 echo   --out PATH       Set output folder root (supports spaces, default: dist\\windows)

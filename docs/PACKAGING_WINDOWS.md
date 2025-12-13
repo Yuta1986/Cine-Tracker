@@ -30,3 +30,8 @@ Runtime resolution policy:
 ## Notes
 - COLMAP Windows CUDA release ships `colmap.exe` and a set of DLLs that must be placed adjacent to it.
 - FFmpeg Windows builds may be static or may require DLLs; bundle them similarly.
+
+## Automated fetching
+The Windows build helper can download the required external binaries into `third_party/bin`:
+- COLMAP: `scripts/fetch_colmap_windows_cuda.py` (invoked by `build_windows.bat --fetch-colmap`)
+- FFmpeg: `scripts/fetch_ffmpeg_windows.py` (invoked by `build_windows.bat --fetch-ffmpeg`)

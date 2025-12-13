@@ -42,6 +42,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SYSROOT="${ROOT}/sysroot"
 export LD_LIBRARY_PATH="${SYSROOT}/usr/lib/x86_64-linux-gnu:${SYSROOT}/usr/lib/x86_64-linux-gnu/lapack:${SYSROOT}/usr/lib/x86_64-linux-gnu/blas:${SYSROOT}/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+QT_PLUGINS="${SYSROOT}/usr/lib/x86_64-linux-gnu/qt5/plugins"
+if [[ -d "${QT_PLUGINS}" ]]; then
+  export QT_PLUGIN_PATH="${QT_PLUGIN_PATH:-${QT_PLUGINS}}"
+  export QT_QPA_PLATFORM_PLUGIN_PATH="${QT_QPA_PLATFORM_PLUGIN_PATH:-${QT_PLUGINS}/platforms}"
+  export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}"
+fi
 exec "${SYSROOT}/usr/bin/colmap" "$@"
 SH
 chmod +x "${TP}/bin/colmap"
@@ -54,4 +60,3 @@ echo ""
 echo "Tip:"
 echo "  export FFMPEG_BIN=\"${TP}/bin/ffmpeg\""
 echo "  export COLMAP_BIN=\"${TP}/bin/colmap\""
-
