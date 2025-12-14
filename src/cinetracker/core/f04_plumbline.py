@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 from typing import Iterable, TextIO
 
@@ -12,6 +13,8 @@ class PlumbLineInput:
     sample_uv: np.ndarray  # (N,2) float64 distorted pixels
     sample_line_id: np.ndarray  # (N,) int32
     num_lines: int
+    image_width: int
+    image_height: int
     fx: float
     fy: float
     cx: float
@@ -27,6 +30,64 @@ class PlumbLineIterationMetrics:
     k2: float
     median_line_px: float
     lambda_line: float
+
+
+CONF_ALPHA: float = -math.log(0.9)
+
+
+def compute_spatial_coverage(
+    sample_uv: np.ndarray,
+    *,
+    image_width: int,
+    image_height: int,
+    grid: int = 8,
+) -> float:
+    pts = np.asarray(sample_uv, dtype=np.float64)
+    if pts.ndim != 2 or pts.shape[1] != 2:
+        raise ValueError(f"sample_uv must have shape (N,2), got {pts.shape}")
+    if image_width <= 0 or image_height <= 0:
+        raise ValueError("image_width/image_height must be > 0")
+    g = int(grid)
+    if g <= 0:
+        raise ValueError("grid must be > 0")
+    if pts.size == 0:
+        return 0.0
+
+    x = np.clip(pts[:, 0], 0.0, float(image_width) - 1.0)
+    y = np.clip(pts[:, 1], 0.0, float(image_height) - 1.0)
+    gx = np.minimum(g - 1, (x * g / float(image_width)).astype(np.int32))
+    gy = np.minimum(g - 1, (y * g / float(image_height)).astype(np.int32))
+    cells = np.unique(gy * g + gx)
+    return float(cells.size) / float(g * g)
+
+
+def compute_confidence_score(*, coverage: float, median_plumb_line_residual_px: float, alpha: float = CONF_ALPHA) -> float:
+    c = float(np.clip(float(coverage), 0.0, 1.0))
+    e = float(median_plumb_line_residual_px)
+    if not np.isfinite(e):
+        return 0.0
+    return float(c * math.exp(-float(alpha) * max(0.0, e)))
+
+
+def compute_f04_metadata(
+    pl: PlumbLineInput,
+    *,
+    final_k1: float,
+    final_k2: float,
+) -> dict[str, float | int]:
+    und = undistort_points_k1k2_fixed_point(
+        pl.sample_uv, fx=pl.fx, fy=pl.fy, cx=pl.cx, cy=pl.cy, k1=float(final_k1), k2=float(final_k2), iterations=8
+    )
+    line_abc = fit_lines_tls_abc(und, pl.sample_line_id, pl.num_lines)
+    resid = point_to_line_distance_px(und, line_abc, pl.sample_line_id)
+    median_px = float(np.median(np.abs(resid))) if resid.size else float("inf")
+    coverage = compute_spatial_coverage(pl.sample_uv, image_width=pl.image_width, image_height=pl.image_height, grid=8)
+    score = compute_confidence_score(coverage=coverage, median_plumb_line_residual_px=median_px)
+    return {
+        "confidence_score": float(score),
+        "median_plumb_line_residual_px": float(median_px),
+        "line_count": int(pl.num_lines),
+    }
 
 
 def _require_opencv() -> "object":
@@ -225,11 +286,17 @@ def build_plumbline_input_from_images(
     all_ids: list[np.ndarray] = []
     line_offset = 0
     total_lines = 0
+    image_width = 0
+    image_height = 0
 
     for i, p in enumerate(files):
         img = cv2.imread(str(p), cv2.IMREAD_COLOR)
         if img is None:
             continue
+        if image_width == 0:
+            h, w = img.shape[:2]
+            image_width = int(w)
+            image_height = int(h)
         segs = detect_lines_lsd(img, min_length_px=min_line_length_px, max_lines=max_lines_per_image)
         if segs.shape[0] == 0:
             continue
@@ -245,6 +312,8 @@ def build_plumbline_input_from_images(
 
     if not all_samples:
         raise RuntimeError("No usable lines found (try lowering min length / increasing max lines).")
+    if image_width <= 0 or image_height <= 0:
+        raise RuntimeError("Failed to read image dimensions from inputs.")
 
     sample_uv = np.ascontiguousarray(np.concatenate(all_samples, axis=0), dtype=np.float64)
     sample_line_id = np.ascontiguousarray(np.concatenate(all_ids, axis=0), dtype=np.int32)
@@ -252,6 +321,8 @@ def build_plumbline_input_from_images(
         sample_uv=sample_uv,
         sample_line_id=sample_line_id,
         num_lines=total_lines,
+        image_width=image_width,
+        image_height=image_height,
         fx=float(fx),
         fy=float(fy),
         cx=float(cx),
@@ -325,4 +396,3 @@ def refine_k1k2_plumbline_only(
         k1, k2 = float(res["k1"]), float(res["k2"])
 
     return k1, k2, metrics
-

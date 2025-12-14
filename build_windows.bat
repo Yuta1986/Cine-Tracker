@@ -13,6 +13,7 @@ set "PY=%VENV_DIR%\Scripts\python.exe"
 
 set "FETCH_COLMAP=0"
 set "FETCH_FFMPEG=0"
+set "BUILD_NATIVE=0"
 set "FORCE=0"
 set "OUT_DIR=dist\\windows"
 set "MODE=both"
@@ -31,6 +32,7 @@ if "%SCRIPT_DIR:~0,2%"=="\\\\" (
 if "%~1"=="" goto args_done
 if /I "%~1"=="--fetch-colmap" ( set "FETCH_COLMAP=1" & shift & goto parse_args )
 if /I "%~1"=="--fetch-ffmpeg" ( set "FETCH_FFMPEG=1" & shift & goto parse_args )
+if /I "%~1"=="--build-native" ( set "BUILD_NATIVE=1" & shift & goto parse_args )
 if /I "%~1"=="--force" ( set "FORCE=1" & shift & goto parse_args )
 if /I "%~1"=="--onedir" ( set "MODE=onedir" & shift & goto parse_args )
 if /I "%~1"=="--onefile" ( set "MODE=onefile" & shift & goto parse_args )
@@ -124,6 +126,20 @@ if errorlevel 1 exit /b 1
 echo Installing PyInstaller...
 "%PY%" -m pip install -U pyinstaller
 if errorlevel 1 exit /b 1
+
+if "%BUILD_NATIVE%"=="1" (
+  if not defined VSINSTALLDIR (
+    echo NOTE: VSINSTALLDIR is not set. If native build fails, run this from:
+    echo       "Developer Command Prompt for VS 2022"
+  )
+  echo Building native extension (cinetracker_native)...
+  if defined VCPKG_ROOT (
+    "%PY%" scripts\build_extension.py --config Release --install-to src --vcpkg-root "%VCPKG_ROOT%"
+  ) else (
+    "%PY%" scripts\build_extension.py --config Release --install-to src
+  )
+  if errorlevel 1 exit /b 1
+)
 
 if "%FETCH_COLMAP%"=="1" (
   echo Fetching COLMAP Windows CUDA binary into third_party\bin ...

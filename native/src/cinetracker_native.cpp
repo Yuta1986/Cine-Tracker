@@ -92,6 +92,99 @@ static void RequireShape(const py::buffer_info& info,
 
 }  // namespace
 
+py::dict plumbline_refine_k1k2_bridge(
+    py::array_t<double, py::array::c_style | py::array::forcecast> sample_uv_distorted,   // (N,2)
+    py::array_t<std::int32_t, py::array::c_style | py::array::forcecast> line_id,          // (N,)
+    py::array_t<double, py::array::c_style | py::array::forcecast> line_abc_undistorted,   // (L,3)
+    py::array_t<double, py::array::c_style | py::array::forcecast> intrinsics_fx_fy_cx_cy, // (4,)
+    py::array_t<double, py::array::c_style | py::array::forcecast> distortion_k1_k2,       // (2,)
+    double lambda_line_weight) {
+  auto uv_info = sample_uv_distorted.request();
+  auto id_info = line_id.request();
+  auto abc_info = line_abc_undistorted.request();
+  auto intr_info = intrinsics_fx_fy_cx_cy.request();
+  auto k_info = distortion_k1_k2.request();
+
+  RequireShape(uv_info, "sample_uv_distorted", {-1, 2});
+  RequireShape(id_info, "line_id", {-1});
+  RequireShape(abc_info, "line_abc_undistorted", {-1, 3});
+  RequireShape(intr_info, "intrinsics_fx_fy_cx_cy", {4});
+  RequireShape(k_info, "distortion_k1_k2", {2});
+
+  if (uv_info.shape[0] != id_info.shape[0]) {
+    throw std::runtime_error("sample_uv_distorted and line_id must have same length");
+  }
+
+  const auto* uv = static_cast<const double*>(uv_info.ptr);
+  const auto* ids = static_cast<const std::int32_t*>(id_info.ptr);
+  const auto* abc = static_cast<const double*>(abc_info.ptr);
+  const auto* intr = static_cast<const double*>(intr_info.ptr);
+  const auto* k_init = static_cast<const double*>(k_info.ptr);
+
+  const std::int64_t n = static_cast<std::int64_t>(uv_info.shape[0]);
+  const std::int64_t l = static_cast<std::int64_t>(abc_info.shape[0]);
+
+  const double fx = intr[0];
+  const double fy = intr[1];
+  const double cx = intr[2];
+  const double cy = intr[3];
+
+  double k[2] = {k_init[0], k_init[1]};
+
+  ceres::Problem problem;
+  const double sqrt_lambda = std::sqrt(std::max(0.0, lambda_line_weight));
+
+  // Fixed robustifier for Phase-1 bridge (configurable via the legacy entrypoint).
+  const double cauchy_scale_px = 2.0;
+  std::unique_ptr<ceres::LossFunction> loss = std::make_unique<ceres::CauchyLoss>(cauchy_scale_px);
+
+  for (std::int64_t i = 0; i < n; ++i) {
+    const std::int32_t lid = ids[i];
+    if (lid < 0 || lid >= l) {
+      continue;
+    }
+    const double u_d = uv[2 * i + 0];
+    const double v_d = uv[2 * i + 1];
+
+    const double a = abc[3 * lid + 0];
+    const double b = abc[3 * lid + 1];
+    const double c = abc[3 * lid + 2];
+    if (!std::isfinite(a) || !std::isfinite(b) || !std::isfinite(c)) {
+      continue;
+    }
+    if (a == 0.0 && b == 0.0) {
+      continue;
+    }
+
+    auto* cost = new ceres::AutoDiffCostFunction<PlumbLineResidual, 1, 2>(
+        new PlumbLineResidual(u_d, v_d, fx, fy, cx, cy, a, b, c, sqrt_lambda));
+    problem.AddResidualBlock(cost, loss.get(), k);
+  }
+
+  ceres::Solver::Options options;
+  options.max_num_iterations = 50;
+  options.linear_solver_type = ceres::DENSE_QR;
+  options.minimizer_progress_to_stdout = false;
+  options.num_threads = 1;
+
+  ceres::Solver::Summary summary;
+  ceres::Solve(options, &problem, &summary);
+
+  py::dict out;
+  out["success"] = summary.IsSolutionUsable();
+  out["k1"] = k[0];
+  out["k2"] = k[1];
+  out["initial_cost"] = summary.initial_cost;
+  out["final_cost"] = summary.final_cost;
+  out["iterations"] = summary.iterations.size();
+  out["brief_report"] = summary.BriefReport();
+  out["full_report"] = summary.FullReport();
+  out["num_residuals"] = summary.num_residuals;
+  out["cauchy_scale_px"] = cauchy_scale_px;
+  out["max_num_iterations"] = options.max_num_iterations;
+  return out;
+}
+
 py::dict plumbline_refine_k1k2(py::array_t<double, py::array::c_style | py::array::forcecast> sample_uv,
                                py::array_t<std::int32_t, py::array::c_style | py::array::forcecast> sample_line_id,
                                py::array_t<double, py::array::c_style | py::array::forcecast> line_abc,
@@ -180,6 +273,15 @@ PYBIND11_MODULE(cinetracker_native, m) {
   m.doc() = "Cine-Tracker native extension (Ceres + pybind11)";
 
   m.def("plumbline_refine_k1k2",
+        &plumbline_refine_k1k2_bridge,
+        py::arg("sample_uv_distorted"),
+        py::arg("line_id"),
+        py::arg("line_abc_undistorted"),
+        py::arg("intrinsics_fx_fy_cx_cy"),
+        py::arg("distortion_k1_k2"),
+        py::arg("lambda_line_weight"));
+
+  m.def("plumbline_refine_k1k2",
         &plumbline_refine_k1k2,
         py::arg("sample_uv"),
         py::arg("sample_line_id"),
@@ -194,4 +296,3 @@ PYBIND11_MODULE(cinetracker_native, m) {
         py::arg("cauchy_scale_px") = 2.0,
         py::arg("max_num_iterations") = 50);
 }
-

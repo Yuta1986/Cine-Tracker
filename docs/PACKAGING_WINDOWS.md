@@ -36,3 +36,14 @@ Runtime resolution policy:
 The Windows build helper can download the required external binaries into `third_party/bin`:
 - COLMAP: `scripts/fetch_colmap_windows_cuda.py` (invoked by `build_windows.bat --fetch-colmap`)
 - FFmpeg: `scripts/fetch_ffmpeg_windows.py` (invoked by `build_windows.bat --fetch-ffmpeg`)
+
+## (F-04) Native extension build (optional)
+If you want to build and bundle the native Ceres/pybind11 extension:
+- Run the build from **Developer Command Prompt for VS 2022** (MSVC toolchain on PATH).
+- Recommended vcpkg triplet for Python CRT compatibility: `x64-windows-static-md`.
+  - Set `VCPKG_ROOT` and (optionally) `VCPKG_TARGET_TRIPLET=x64-windows-static-md`.
+- Build via the Windows helper:
+  - `build_windows.bat --build-native --fetch-colmap --fetch-ffmpeg`
+
+Notes:
+- `--build-native` calls `scripts/build_extension.py` which configures CMake for `native/` and copies `cinetracker_native.pyd` into `src/` prior to packaging.

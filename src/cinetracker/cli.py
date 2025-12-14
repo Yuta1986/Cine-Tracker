@@ -156,7 +156,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "f04-plumbline-refine":
         from cinetracker.core.colmap_db import load_intrinsics_spec
-        from cinetracker.core.f04_plumbline import build_plumbline_input_from_images, refine_k1k2_plumbline_only
+        from cinetracker.core.f04_plumbline import (
+            build_plumbline_input_from_images,
+            compute_f04_metadata,
+            refine_k1k2_plumbline_only,
+        )
         from cinetracker.core.lens_json import write_lens_calibration_json
 
         spec = load_intrinsics_spec(args.lens_json, override_model="OPENCV")
@@ -193,6 +197,8 @@ def main(argv: list[str] | None = None) -> int:
             out=sys.stdout,
         )
 
+        f04_metadata = compute_f04_metadata(pl, final_k1=k1, final_k2=k2)
+
         out_dict = {
             "version": 1,
             "camera_model": "OPENCV",
@@ -206,6 +212,7 @@ def main(argv: list[str] | None = None) -> int:
             "k2": float(k2),
             "p1": float(spec.params_by_name.get("p1", 0.0)),
             "p2": float(spec.params_by_name.get("p2", 0.0)),
+            "f04_metadata": f04_metadata,
             "f04_plumbline": {
                 "outer_iters": int(args.outer_iters),
                 "cauchy_scale_px": float(args.cauchy_scale),
