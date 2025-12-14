@@ -34,6 +34,11 @@ Add an entry here at the end of each work session (and when closing a sprint) so
   - Decisions: Keep both pybind overloads for `plumbline_refine_k1k2` (legacy scalar args + new array-based bridge signature) for compatibility and incremental migration.
   - Next: Implement the next F-04 native blocks on `feature/f-04-hybrid-calib` (priors + staged unlocks); add a real-data regression test for the Phase-1 refine pipeline.
   - Blockers: None.
+- **Session 2025-12-14 (Cont.)** (Sprint 4 / F-04 Phase 1 E2E + Phase 2 Skeleton)
+  - Changes: Ran end-to-end Phase 1 prototype (`cinetracker f04-plumbline-refine`) successfully (OpenCV LSD + Ceres native solve + `f04_metadata` emitted). Added Phase 2 native entrypoint (`plumbline_refine_opencv8_phase2`) with OPENCV8 parameters + NormalPrior stabilization (cx/cy, p1/p2) and fixed a Ceres parameter aliasing crash in prior wiring.
+  - Decisions: Phase 2 priors are applied on the single 8-parameter block (avoid overlapping parameter blocks); keep fx/fy constrained positive.
+  - Next: Wire Phase 2 native call into Python pipeline (new CLI flag/subcommand) and validate on real image sets; extend to staged Phase 3 once reprojection residuals + structure are integrated.
+  - Blockers: None.
 - **Session 2025-12-14** (Sprint 4 / Post-implementation)
   - Changes: Added a session/sprint log section and standardized project memory to a single canonical file with a compatibility pointer.
   - Decisions: Treat `PROJECT_MEMORY.md` as the canonical project memory file.
