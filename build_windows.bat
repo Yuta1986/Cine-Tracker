@@ -13,6 +13,7 @@ set "WIN_SYSTEM32=%SystemRoot%\System32"
 set "CHOICE_EXE=%WIN_SYSTEM32%\choice.exe"
 set "WHERE_EXE=%WIN_SYSTEM32%\where.exe"
 set "EXPLORER_EXE=%WIN_SYSTEM32%\explorer.exe"
+set "POWERSHELL_EXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 
 set "VENV_DIR=.venv-win"
 set "PY=%VENV_DIR%\Scripts\python.exe"
@@ -302,7 +303,7 @@ exit /b %errorlevel%
 
 :choose_out
 for /f "usebackq delims=" %%I in (`
-  powershell -NoProfile -STA -Command "Add-Type -AssemblyName System.Windows.Forms; $d=New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description='Select output folder'; if($d.ShowDialog() -ne 'OK'){ exit 1 }; [Console]::WriteLine($d.SelectedPath)"
+  "%POWERSHELL_EXE%" -NoProfile -STA -Command "Add-Type -AssemblyName System.Windows.Forms; $d=New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description='Select output folder'; if($d.ShowDialog() -ne 'OK'){ exit 1 }; [Console]::WriteLine($d.SelectedPath)"
 `) do set "OUT_DIR=%%I"
 if not defined OUT_DIR exit /b 1
 exit /b 0

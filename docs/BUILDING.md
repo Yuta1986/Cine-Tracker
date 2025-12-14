@@ -45,6 +45,8 @@ Windows executables must be built on Windows (PyInstaller does not cross-compile
 
 ### Prereqs
 - Python **3.10+** installed and available as `python` in `cmd.exe`
+- You do **not** need to create `.venv-win` yourself — `build_windows.bat` creates/uses it automatically.
+- If you have Anaconda/Miniconda: prefer running from a clean terminal (or `conda deactivate`) to avoid PATH/tool conflicts.
 - If you plan to build the optional native extension (`--build-native`):
   - Visual Studio 2022 / Build Tools, and ideally run from **Developer Command Prompt for VS 2022**
 
