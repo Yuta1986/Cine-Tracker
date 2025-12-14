@@ -59,6 +59,11 @@ Add an entry here at the end of each work session (and when closing a sprint) so
   - Decisions: Wrapper runs an outer loop that refits `pl_line_abc` from fixed samples each iteration (mirrors Phase 1) to keep line constraints consistent as intrinsics update.
   - Next: Add a CLI subcommand for Phase 3; implement model write-back (or export JSON/CSV) for optimized poses/points; validate on a larger dataset and tune weights/priors.
   - Blockers: None.
+- **Session 2025-12-14 (Cont.)** (Sprint 4 / F-04 Phase 3 CLI)
+  - Changes: Added `cinetracker f04-full-ba` CLI to run Phase 3 wrapper end-to-end and write updated `lens_calibration_data.json` (with `f04_metadata`) plus optional `.npz` export of optimized arrays and metrics.
+  - Decisions: Keep Phase 3 outputs as JSON + optional NPZ until a COLMAP binary writer is implemented.
+  - Next: Run the new CLI on a small model for a repeatable demo; then decide on a model write-back/export format.
+  - Blockers: None.
 - **Session 2025-12-14** (Sprint 4 / Post-implementation)
   - Changes: Added a session/sprint log section and standardized project memory to a single canonical file with a compatibility pointer.
   - Decisions: Treat `PROJECT_MEMORY.md` as the canonical project memory file.

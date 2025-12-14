@@ -73,6 +73,29 @@ def main(argv: list[str] | None = None) -> int:
     f04.add_argument("--lambda-cap", type=float, default=5.0, help="Max lambda_line")
     f04.add_argument("--cauchy-scale", type=float, default=2.0, help="Cauchy robust loss scale in pixels")
 
+    f04_ba = sub.add_parser(
+        "f04-full-ba",
+        help="F-04 Phase 3: joint BA with reprojection + plumb-line constraints (requires native Ceres extension + OpenCV)",
+    )
+    f04_ba.add_argument("--model", required=True, help="Path to COLMAP sparse model dir (e.g., sparse/0)")
+    f04_ba.add_argument("--images-root", required=True, help="Directory containing the images referenced by images.bin")
+    f04_ba.add_argument("--out-json", required=True, help="Output lens_calibration_data.json (updated OPENCV + f04_metadata)")
+    f04_ba.add_argument("--out-npz", default=None, help="Optional .npz to save optimized arrays (opencv8/poses/points + metrics)")
+    f04_ba.add_argument("--max-images", type=int, default=0, help="Limit images for line detection (0 = all)")
+    f04_ba.add_argument("--max-lines-per-image", type=int, default=200, help="Max LSD segments per image")
+    f04_ba.add_argument("--min-line-length", type=float, default=120.0, help="Minimum line length in pixels")
+    f04_ba.add_argument("--sample-step", type=float, default=8.0, help="Sample step along line segments in pixels")
+    f04_ba.add_argument("--outer-iters", type=int, default=2, help="Outer iterations (refit lines -> Ceres solve)")
+    f04_ba.add_argument("--lambda-reproj", type=float, default=1.0, help="Reprojection residual weight")
+    f04_ba.add_argument("--lambda-line", type=float, default=0.2, help="Plumb-line residual weight")
+    f04_ba.add_argument("--huber-px", type=float, default=2.0, help="Huber loss scale (px) for reprojection")
+    f04_ba.add_argument("--cauchy-px", type=float, default=2.0, help="Cauchy loss scale (px) for plumb-line")
+    f04_ba.add_argument("--max-iters", type=int, default=50, help="Ceres max iterations per outer iter")
+    f04_ba.add_argument("--threads", type=int, default=1, help="Ceres num_threads")
+    f04_ba.add_argument("--no-refine-intrinsics", action="store_true", help="Hold opencv8 constant")
+    f04_ba.add_argument("--no-refine-poses", action="store_true", help="Hold poses constant")
+    f04_ba.add_argument("--no-refine-points", action="store_true", help="Hold 3D points constant")
+
     gui = sub.add_parser("gui", help="Start the PySide6 GUI")
 
     prof = sub.add_parser("profile", help="Manage reusable lens profiles (saved lens_calibration_data.json)")
@@ -234,6 +257,83 @@ def main(argv: list[str] | None = None) -> int:
         }
         write_lens_calibration_json(out_dict, args.out_json)
         print(f"[f04] wrote: {args.out_json}")
+        return 0
+
+    if args.cmd == "f04-full-ba":
+        from cinetracker.core.f04_plumbline import build_sparse_ba_inputs_from_colmap_model, f04_hybrid_bundle_adjustment
+        from cinetracker.core.lens_json import write_lens_calibration_json
+
+        ba = build_sparse_ba_inputs_from_colmap_model(model_dir=args.model)
+        res = f04_hybrid_bundle_adjustment(
+            model_dir=args.model,
+            images_root=args.images_root,
+            lambda_reproj=args.lambda_reproj,
+            lambda_line=args.lambda_line,
+            huber_px=args.huber_px,
+            cauchy_px=args.cauchy_px,
+            max_num_iterations=args.max_iters,
+            num_threads=args.threads,
+            refine_intrinsics=not args.no_refine_intrinsics,
+            refine_poses=not args.no_refine_poses,
+            refine_points=not args.no_refine_points,
+            max_images=args.max_images,
+            max_lines_per_image=args.max_lines_per_image,
+            min_line_length_px=args.min_line_length,
+            sample_step_px=args.sample_step,
+            outer_iters=args.outer_iters,
+            out=sys.stdout,
+        )
+
+        opencv8 = res["opencv8"]
+        f04_metadata = res["f04_metadata"]
+        fx, fy, cx, cy, k1, k2, p1, p2 = [float(x) for x in opencv8]
+        out_dict = {
+            "version": 1,
+            "camera_model": "OPENCV",
+            "image_width": int(ba.image_width),
+            "image_height": int(ba.image_height),
+            "fx": fx,
+            "fy": fy,
+            "cx": cx,
+            "cy": cy,
+            "k1": k1,
+            "k2": k2,
+            "p1": p1,
+            "p2": p2,
+            "f04_metadata": f04_metadata,
+            "f04_phase3": {
+                "model_dir": str(args.model),
+                "images_root": str(args.images_root),
+                "outer_iters": int(args.outer_iters),
+                "lambda_reproj": float(args.lambda_reproj),
+                "lambda_line": float(args.lambda_line),
+                "huber_px": float(args.huber_px),
+                "cauchy_px": float(args.cauchy_px),
+                "max_iters": int(args.max_iters),
+                "threads": int(args.threads),
+            },
+        }
+        write_lens_calibration_json(out_dict, args.out_json)
+        print(f"[f04-ba] wrote: {args.out_json}")
+
+        if args.out_npz:
+            import numpy as np
+
+            native = res["native"]
+            np.savez_compressed(
+                args.out_npz,
+                opencv8=np.asarray(res["opencv8"], dtype=np.float64),
+                camera_qvec_tvec=np.asarray(res["camera_qvec_tvec"], dtype=np.float64),
+                points_xyz=np.asarray(res["points_xyz"], dtype=np.float64),
+                confidence_score=float(native.get("confidence_score", 0.0)),
+                coverage_spatial=float(native.get("coverage_spatial", 0.0)),
+                median_plumb_line_residual_px=float(native.get("median_plumb_line_residual_px", float("inf"))),
+                line_count=int(native.get("line_count", 0)),
+                final_cost=float(native.get("final_cost", float("nan"))),
+                num_residuals=int(native.get("num_residuals", 0)),
+            )
+            print(f"[f04-ba] wrote: {args.out_npz}")
+
         return 0
 
     if args.cmd == "gui":
