@@ -1,10 +1,41 @@
 # PROJECT_MEMORY.md - OSS Cine-Tracker Project Log
 
+Single source of truth: update this file at the end of each work session and when closing a sprint.
+Legacy alias `Project memory.md` is kept as a pointer for convenience.
+
+## 0. Session & Sprint Log (always update)
+Add an entry here at the end of each work session (and when closing a sprint) so progress is easy to audit.
+
+**Template (copy/paste):**
+- **Session YYYY-MM-DD** (Sprint X)
+  - Changes:
+  - Decisions:
+  - Next:
+  - Blockers:
+
+**Log:**
+- **Session 2025-12-14 (Latest)** (Sprint 4 / F-04 Specification & Build)
+  - Changes: Confirmed full F-04 specification (Plumb-Line constraint, Ceres backend). Created dedicated feature branch. FFmpeg bundling added and verified.
+  - Decisions: Windows build (`build_windows.bat --fetch-colmap --fetch-ffmpeg`) successful and ready for UAT. F-04 implementation deferred to feature branch (`feature/f-04-hybrid-calib`).
+  - Next: Execute UAT Checklist on the successfully built Windows `.exe` to validate F-01/F-02/S4.1 functionality. Concurrently, start S4.5/S4.6 implementation on the F-04 feature branch (WSL).
+  - Blockers: None.
+- **Session 2025-12-14 (Cont.)** (Sprint 4 / F-04 Refinement)
+  - Changes: Finalized F-04 output schema extension and optimization scope to prevent ambiguity during UAT and downstream integration.
+  - Decisions: Reuse standard `lens_calibration_data.json` OPENCV keys and add mandatory `f04_metadata` with confidence/fit metrics. Define F-04 optimization as staged joint BA (ending in full joint constrained BA with strong priors on weak parameters).
+  - Next: Keep UAT as the gate for shipping F-01/F-02/S4.1; implement S4.5/S4.6 on `feature/f-04-hybrid-calib` in parallel.
+  - Blockers: None.
+- **Session 2025-12-14** (Sprint 4 / Post-implementation)
+  - Changes: Added a session/sprint log section and standardized project memory to a single canonical file with a compatibility pointer.
+  - Decisions: Treat `PROJECT_MEMORY.md` as the canonical project memory file.
+  - Next: Keep this log updated every session/sprint; run UE 5.7 UAT and Windows build when ready.
+  - Blockers: None in-repo; UE validation requires running Unreal Engine.
+
 ## 1. Project Goal & Scope
 **Objective:** Create a Python/COLMAP desktop application for high-precision camera tracking optimized for Unreal Engine (UE) Composure.
 **Core Modes:**
-1.  **Calibration Mode (F-01):** Outputs `lens_calibration_data.json` (fixed intrinsics).
+1.  **Calibration Mode (F-01):** Outputs `lens_calibration_data.json` (fixed intrinsics; checkerboard required).
 2.  **Tracking Mode (F-02):** Outputs `camera_path.abc` (extrinsics only, using fixed intrinsics).
+3.  **Hybrid Calibration Mode (F-04):** Outputs `lens_calibration_data.json` with checkerboard-free distortion estimates from general scene footage (adds `f04_metadata` confidence/fit metrics).
 
 ## 2. Technical Constraints and Prerequisites
 | Constraint | Status | Details |
@@ -14,6 +45,7 @@
 | **Core Tool** | Fixed | COLMAP (using the `OPENCV` camera model). |
 | **Output Formats** | Fixed | Alembic (`.abc`) for path; JSON for lens parameters. |
 | **UE Integration** | Target | Automatic import via UE Python scripts. |
+| **F-04 Backend** | Defined (Deferred) | Requires a custom **Ceres Solver** C++ extension (via **pybind11**) for performance/robustness (Windows DLL build via MSVC); developed on `feature/f-04-hybrid-calib` and not yet integrated into mainline. |
 
 ## 3. Latest Decisions and Status
 | Decision Point | Status | Details |
@@ -35,15 +67,26 @@
 | **S2.4 Basis Matrix** | Defined | `M_{COLMAP→UE} = [[1,0,0,0],[0,0,1,0],[0,-1,0,0],[0,0,0,1]]` mapping OpenCV/COLMAP camera axes (x right, y down, z forward) to UE world axes (X right, Y forward, Z up). |
 | **Completed (S3.1/S3.2)** | Done | PySide6 UI skeleton + QThread signal/slot worker for non-blocking subprocess execution + log/progress streaming. |
 | **Completed (S3.3/S3.4)** | Done | Packaging plan + PyInstaller spec + runtime bootstrap that sets `COLMAP_BIN` / `FFMPEG_BIN` from bundled `third_party/bin` at startup. |
-| **Next Action** | Pending | Execute **S4.1 / S4.2**: UE Python scripts (Lens File asset creation from JSON + Alembic import/binding to Cine Camera + Level Sequence). |
 | **I/O Logic** | Defined | COLMAP poses ($T_{W \\to C}$) must be inverted for UE/Alembic ($T_{C \\to W}$). |
 | **S4.1 (UE Lens File Script)** | Implemented (needs UE run) | Added UE Python script to create a LensFile asset from `lens_calibration_data.json` and populate Brown-Conrady distortion where public API exists. |
 | **S4.2 (UE Alembic Import/Bind Script)** | Implemented (needs UE run) | Added UE Python script to import Alembic, create/find CineCameraActor, assign LensFile, and bind actor to a Level Sequence (Alembic-to-camera track creation is UE-version dependent). |
 | **S4.3 (UAT Checklist)** | Drafted | Added UAT checklist for end-to-end validation in UE 5.7. |
 | **S4.4 (Docs Outline)** | Drafted | Added documentation outline including licensing + troubleshooting sections. |
 | **README Licensing Section** | Done | Added licensing/attribution section naming COLMAP (The Structure-from-Motion Software) and FFmpeg and other key dependencies. |
-| **PyInstaller Build** | Done (Linux) | Ran `pyinstaller --clean packaging/cinetracker.spec`; produced `dist/cinetracker` (Linux ELF). For a Windows `cinetracker.exe`, run the same spec on Windows Python. |
-| **Next Action** | Final Review | Run Windows build + execute UE 5.7 UAT checklist for delivery. |
+| **PyInstaller Build (Linux)** | Done | Ran `pyinstaller --clean packaging/cinetracker.spec`; produced `dist/cinetracker` (Linux ELF). |
+| **Windows Build (PyInstaller)** | Done (Ready for UAT) | Windows build succeeded using `build_windows.bat --fetch-colmap --fetch-ffmpeg` and FFmpeg bundling was verified; execute UAT on the built `.exe`. |
+| **F-04 Hybrid Calibration** | In-Progress (Deferred) | Major new feature: checkerboard-free distortion estimation via constrained bundle adjustment regularized by a Plumb-Line constraint; staged joint BA is required; implementation isolated on `feature/f-04-hybrid-calib` due to native dependency + stability risks. |
+| **Next Action** | UAT + Parallel Dev | Run UE 5.7 UAT on the Windows build for F-01/F-02/S4.1; in parallel, implement S4.5/S4.6 for F-04 on `feature/f-04-hybrid-calib` (WSL). |
+
+## 4. F-04 Feature Development (Deferred/In-Progress)
+| Decision Point | Status | Details |
+| :--- | :--- | :--- |
+| **F-04: Hybrid Calibration** | In-Progress (Branch) | **Checkerboard-free distortion estimation** from general footage; implemented on `feature/f-04-hybrid-calib` to avoid regressions in F-01/F-02. |
+| **F-04 Core Method** | Defined | Constrained bundle adjustment (joint optimization) regularized by the **Plumb-Line Constraint** derived from detected 2D line segments. Reprojection error remains in the cost function to anchor the solution to 3D structure. |
+| **F-04 Backend** | Defined (Deferred) | Custom **Ceres Solver** C++ extension via **pybind11** for performance/robustness; requires cross-platform native builds (Windows DLL via MSVC). |
+| **F-04 Optimization Scope** | Defined | **Staged Joint BA** with incremental unlock: Phase 1 optimize `K1,K2` only; Phase 2 optimize `K1,K2,P1,P2` + intrinsics (`fx,fy,cx,cy`) while holding poses/points; Phase 3 optimize distortion + intrinsics + poses + 3D points (full joint constrained BA). Final delivery runs **Phase 3** with strong priors/damping on weak parameters (`P1,P2,cx,cy`). |
+| **F-04 Output Schema** | Defined | Reuse the standard `lens_calibration_data.json` OPENCV keys for intrinsics/distortion; add mandatory `f04_metadata` block so downstream tooling can reject low-confidence results. Required fields: `confidence_score` (0.0–1.0), `median_plumb_line_residual_px`, `line_count`. |
+| **S4.5/S4.6 Status** | In Development | Implement the `pybind11` ⇄ Ceres data bridge and the plumb-line residual cost function + robust loss, then integrate into a CLI/UI workflow guarded by the `f04_metadata` metrics. |
 
 ---
 **END OF PROJECT MEMORY**
