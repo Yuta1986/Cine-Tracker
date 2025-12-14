@@ -7,6 +7,9 @@ from typing import Iterable, TextIO
 
 import numpy as np
 
+from cinetracker.core.colmap_reader import COLMAPReader
+from cinetracker.core.lens_json import opencv_intrinsics_from_colmap_camera
+
 
 @dataclass(frozen=True)
 class PlumbLineInput:
@@ -202,6 +205,42 @@ def undistort_points_k1k2_fixed_point(
     return np.stack([u_u, v_u], axis=1)
 
 
+def undistort_points_opencv8_fixed_point(
+    uv: np.ndarray,
+    *,
+    fx: float,
+    fy: float,
+    cx: float,
+    cy: float,
+    k1: float,
+    k2: float,
+    p1: float,
+    p2: float,
+    iterations: int = 8,
+) -> np.ndarray:
+    pts = np.asarray(uv, dtype=np.float64)
+    if pts.ndim != 2 or pts.shape[1] != 2:
+        raise ValueError(f"uv must have shape (N,2), got {pts.shape}")
+
+    x_d = (pts[:, 0] - cx) / fx
+    y_d = (pts[:, 1] - cy) / fy
+    x = x_d.copy()
+    y = y_d.copy()
+    for _ in range(int(iterations)):
+        r2 = x * x + y * y
+        r4 = r2 * r2
+        radial = 1.0 + k1 * r2 + k2 * r4
+        x_tan = 2.0 * p1 * x * y + p2 * (r2 + 2.0 * x * x)
+        y_tan = p1 * (r2 + 2.0 * y * y) + 2.0 * p2 * x * y
+        x_proj = x * radial + x_tan
+        y_proj = y * radial + y_tan
+        x += x_d - x_proj
+        y += y_d - y_proj
+    u_u = x * fx + cx
+    v_u = y * fy + cy
+    return np.stack([u_u, v_u], axis=1)
+
+
 def fit_lines_tls_abc(undistorted_uv: np.ndarray, sample_line_id: np.ndarray, num_lines: int) -> np.ndarray:
     """
     Total least squares line fit (in pixel space) for each line id.
@@ -254,6 +293,128 @@ def point_to_line_distance_px(uv: np.ndarray, line_abc: np.ndarray, line_id: np.
     c = abc[ids, 2]
     denom = np.sqrt(a * a + b * b) + 1e-12
     return (a * pts[:, 0] + b * pts[:, 1] + c) / denom
+
+
+@dataclass(frozen=True)
+class SparseBAInputs:
+    opencv8: np.ndarray  # (8,) float64
+    camera_qvec_tvec: np.ndarray  # (C,7) float64
+    points_xyz: np.ndarray  # (P,3) float64
+    obs_uv: np.ndarray  # (N,2) float64
+    obs_cam_idx: np.ndarray  # (N,) int32
+    obs_point_idx: np.ndarray  # (N,) int32
+    image_width: int
+    image_height: int
+    image_ids: np.ndarray  # (C,) int32 in same order as camera_qvec_tvec
+    image_names: list[str]  # (C,)
+
+
+def build_sparse_ba_inputs_from_colmap_model(*, model_dir: str | Path) -> SparseBAInputs:
+    reader = COLMAPReader(model_dir)
+    cameras = reader.read_cameras_bin()
+    images = reader.read_images_bin()
+    points3d = reader.read_points3d_bin()
+
+    if not images:
+        raise RuntimeError("COLMAP model has no images")
+    if not cameras:
+        raise RuntimeError("COLMAP model has no cameras")
+
+    image_items = sorted(images.values(), key=lambda im: im.image_id)
+    camera_ids = {im.camera_id for im in image_items}
+    if len(camera_ids) != 1:
+        raise RuntimeError(f"Phase 3 currently requires a single shared camera_id; got {sorted(camera_ids)}")
+
+    cam_id = next(iter(camera_ids))
+    cam = cameras.get(cam_id)
+    if cam is None:
+        raise RuntimeError(f"camera_id {cam_id} referenced by images.bin not found in cameras.bin")
+
+    opencv = opencv_intrinsics_from_colmap_camera(
+        model_name=cam.model_name,
+        width=cam.width,
+        height=cam.height,
+        params=[float(x) for x in cam.params.tolist()],
+    )
+    opencv8 = np.array(
+        [opencv.fx, opencv.fy, opencv.cx, opencv.cy, opencv.k1, opencv.k2, opencv.p1, opencv.p2],
+        dtype=np.float64,
+    )
+
+    image_id_to_cam_idx = {im.image_id: i for i, im in enumerate(image_items)}
+    camera_qvec_tvec = np.zeros((len(image_items), 7), dtype=np.float64)
+    for i, im in enumerate(image_items):
+        camera_qvec_tvec[i, 0:4] = im.qvec.astype(np.float64, copy=False)
+        camera_qvec_tvec[i, 4:7] = im.tvec.astype(np.float64, copy=False)
+
+    point_items = sorted(points3d.values(), key=lambda p: p.point3D_id)
+    if not point_items:
+        raise RuntimeError("COLMAP model has no 3D points (points3D.bin empty)")
+
+    point_id_to_idx = {p.point3D_id: i for i, p in enumerate(point_items)}
+    points_xyz = np.stack([p.xyz for p in point_items], axis=0).astype(np.float64, copy=False)
+
+    obs_uv: list[list[float]] = []
+    obs_cam_idx: list[int] = []
+    obs_point_idx: list[int] = []
+
+    for p in point_items:
+        p_idx = point_id_to_idx[p.point3D_id]
+        for image_id, point2d_idx in zip(p.track_image_ids.tolist(), p.track_point2D_idxs.tolist(), strict=True):
+            im = images.get(int(image_id))
+            if im is None:
+                continue
+            cam_idx = image_id_to_cam_idx.get(im.image_id)
+            if cam_idx is None:
+                continue
+            if int(point2d_idx) < 0 or int(point2d_idx) >= im.xys.shape[0]:
+                continue
+            if int(im.point3D_ids[int(point2d_idx)]) != int(p.point3D_id):
+                continue
+            xy = im.xys[int(point2d_idx)]
+            obs_uv.append([float(xy[0]), float(xy[1])])
+            obs_cam_idx.append(int(cam_idx))
+            obs_point_idx.append(int(p_idx))
+
+    if not obs_uv:
+        raise RuntimeError("No valid 2D-3D observations could be constructed from points3D tracks")
+
+    return SparseBAInputs(
+        opencv8=np.ascontiguousarray(opencv8, dtype=np.float64),
+        camera_qvec_tvec=np.ascontiguousarray(camera_qvec_tvec, dtype=np.float64),
+        points_xyz=np.ascontiguousarray(points_xyz, dtype=np.float64),
+        obs_uv=np.ascontiguousarray(np.array(obs_uv, dtype=np.float64), dtype=np.float64),
+        obs_cam_idx=np.ascontiguousarray(np.array(obs_cam_idx, dtype=np.int32), dtype=np.int32),
+        obs_point_idx=np.ascontiguousarray(np.array(obs_point_idx, dtype=np.int32), dtype=np.int32),
+        image_width=int(cam.width),
+        image_height=int(cam.height),
+        image_ids=np.ascontiguousarray(np.array([im.image_id for im in image_items], dtype=np.int32), dtype=np.int32),
+        image_names=[im.name for im in image_items],
+    )
+
+
+@dataclass(frozen=True)
+class PlumbLineBAInputs:
+    pl_sample_uv: np.ndarray  # (M,2) float64 distorted pixels
+    pl_sample_line_idx: np.ndarray  # (M,) int32
+    pl_line_abc: np.ndarray  # (L,3) float64 line params in undistorted pixel space
+    pl_line_cam_idx: np.ndarray  # (L,) int32 camera index for each line
+
+
+def refit_pl_line_abc_from_samples(
+    pl_sample_uv: np.ndarray,
+    pl_sample_line_idx: np.ndarray,
+    *,
+    num_lines: int,
+    opencv8: np.ndarray,
+) -> np.ndarray:
+    fx, fy, cx, cy, k1, k2, p1, p2 = [float(x) for x in np.asarray(opencv8, dtype=np.float64).reshape(8)]
+    und = undistort_points_opencv8_fixed_point(
+        pl_sample_uv, fx=fx, fy=fy, cx=cx, cy=cy, k1=k1, k2=k2, p1=p1, p2=p2, iterations=8
+    )
+    if not np.all(np.isfinite(und)):
+        raise RuntimeError("Undistortion produced non-finite values; intrinsics likely diverged")
+    return np.ascontiguousarray(fit_lines_tls_abc(und, pl_sample_line_idx, int(num_lines)), dtype=np.float64)
 
 
 def build_plumbline_input_from_images(
@@ -330,6 +491,197 @@ def build_plumbline_input_from_images(
         k1=float(k1),
         k2=float(k2),
     )
+
+
+def build_plumbline_ba_inputs_from_colmap_images(
+    *,
+    images_root: str | Path,
+    image_names: list[str],
+    opencv8: np.ndarray,
+    max_images: int,
+    max_lines_per_image: int,
+    min_line_length_px: float,
+    sample_step_px: float,
+    out: TextIO,
+) -> PlumbLineBAInputs:
+    """
+    Builds Phase-3 plumb-line inputs from COLMAP image names, associating each detected segment to a camera index.
+
+    Policy:
+    - Detect LSD segments per image in distorted pixel space.
+    - Sample points on each segment in distorted pixel space.
+    - Undistort sampled points using current OPENCV8 via fixed-point iterations.
+    - Fit line_abc in undistorted pixel space (TLS).
+    - Return global line indexing with per-line camera association.
+    """
+    images_root = Path(images_root)
+    if not images_root.is_dir():
+        raise FileNotFoundError(f"images_root not found: {images_root}")
+
+    fx, fy, cx, cy, k1, k2, p1, p2 = [float(x) for x in np.asarray(opencv8, dtype=np.float64).reshape(8)]
+
+    cv2 = _require_opencv()
+    all_sample_uv: list[np.ndarray] = []
+    all_sample_line_idx: list[np.ndarray] = []
+    all_line_abc: list[np.ndarray] = []
+    all_line_cam_idx: list[np.ndarray] = []
+
+    line_offset = 0
+    names = list(image_names)
+    if max_images > 0:
+        names = names[:max_images]
+
+    for cam_idx, name in enumerate(names):
+        p = images_root / name
+        if not p.exists():
+            p = images_root / Path(name).name
+        img = cv2.imread(str(p), cv2.IMREAD_COLOR)
+        if img is None:
+            continue
+        segs = detect_lines_lsd(img, min_length_px=min_line_length_px, max_lines=max_lines_per_image)
+        if segs.shape[0] == 0:
+            continue
+        sample_uv, local_line_id = sample_points_on_segments(segs, step_px=sample_step_px)
+        if sample_uv.shape[0] == 0:
+            continue
+        und = undistort_points_opencv8_fixed_point(
+            sample_uv, fx=fx, fy=fy, cx=cx, cy=cy, k1=k1, k2=k2, p1=p1, p2=p2, iterations=8
+        )
+        line_abc = fit_lines_tls_abc(und, local_line_id, int(segs.shape[0]))
+
+        global_line_id = local_line_id + np.int32(line_offset)
+        all_sample_uv.append(sample_uv)
+        all_sample_line_idx.append(global_line_id)
+        all_line_abc.append(line_abc)
+        all_line_cam_idx.append(np.full((line_abc.shape[0],), cam_idx, dtype=np.int32))
+
+        print(f"[f04-ba] {p.name}: lines={segs.shape[0]} samples={sample_uv.shape[0]}", file=out)
+        line_offset += int(segs.shape[0])
+
+    if not all_sample_uv:
+        raise RuntimeError("No usable plumb-line samples found (try lowering min length / increasing max lines).")
+
+    pl_sample_uv = np.ascontiguousarray(np.concatenate(all_sample_uv, axis=0), dtype=np.float64)
+    pl_sample_line_idx = np.ascontiguousarray(np.concatenate(all_sample_line_idx, axis=0), dtype=np.int32)
+    pl_line_abc = np.ascontiguousarray(np.concatenate(all_line_abc, axis=0), dtype=np.float64)
+    pl_line_cam_idx = np.ascontiguousarray(np.concatenate(all_line_cam_idx, axis=0), dtype=np.int32)
+    return PlumbLineBAInputs(
+        pl_sample_uv=pl_sample_uv,
+        pl_sample_line_idx=pl_sample_line_idx,
+        pl_line_abc=pl_line_abc,
+        pl_line_cam_idx=pl_line_cam_idx,
+    )
+
+
+def f04_hybrid_bundle_adjustment(
+    *,
+    model_dir: str | Path,
+    images_root: str | Path,
+    lambda_reproj: float = 1.0,
+    lambda_line: float = 1.0,
+    huber_px: float = 2.0,
+    cauchy_px: float = 2.0,
+    max_num_iterations: int = 50,
+    num_threads: int = 1,
+    refine_intrinsics: bool = True,
+    refine_poses: bool = True,
+    refine_points: bool = True,
+    max_images: int = 0,
+    max_lines_per_image: int = 200,
+    min_line_length_px: float = 120.0,
+    sample_step_px: float = 8.0,
+    outer_iters: int = 3,
+    out: TextIO | None = None,
+) -> dict[str, object]:
+    """
+    Phase 3 wrapper: extract sparse BA arrays from a COLMAP model and plumb-line arrays from images,
+    call the native Ceres solver, and return updated arrays plus `f04_metadata`.
+
+    Inputs:
+    - `model_dir`: COLMAP sparse model directory containing `cameras.bin/images.bin/points3D.bin`
+    - `images_root`: directory containing images referenced by `images.bin` (by name)
+
+    Output (high-level):
+    - `opencv8`, `camera_qvec_tvec`, `points_xyz`: updated NumPy arrays from native solver
+    - `native`: raw native return dict
+    - `f04_metadata`: dict compatible with PROJECT_MEMORY.md spec
+    """
+    from cinetracker.native import require_native
+
+    if out is None:
+        import sys
+
+        out = sys.stdout
+
+    ba = build_sparse_ba_inputs_from_colmap_model(model_dir=model_dir)
+    pl0 = build_plumbline_ba_inputs_from_colmap_images(
+        images_root=images_root,
+        image_names=ba.image_names,
+        opencv8=ba.opencv8,
+        max_images=max_images,
+        max_lines_per_image=max_lines_per_image,
+        min_line_length_px=min_line_length_px,
+        sample_step_px=sample_step_px,
+        out=out,
+    )
+
+    native = require_native()
+
+    opencv8 = ba.opencv8.copy()
+    camera_qvec_tvec = ba.camera_qvec_tvec.copy()
+    points_xyz = ba.points_xyz.copy()
+    pl_sample_uv = pl0.pl_sample_uv
+    pl_sample_line_idx = pl0.pl_sample_line_idx
+    pl_line_cam_idx = pl0.pl_line_cam_idx
+
+    res: object | None = None
+    for it in range(max(1, int(outer_iters))):
+        pl_line_abc = refit_pl_line_abc_from_samples(
+            pl_sample_uv, pl_sample_line_idx, num_lines=int(pl_line_cam_idx.shape[0]), opencv8=opencv8
+        )
+        res = native.plumbline_refine_full_ba(
+            opencv8,
+            camera_qvec_tvec,
+            points_xyz,
+            ba.obs_uv,
+            ba.obs_cam_idx,
+            ba.obs_point_idx,
+            pl_sample_uv,
+            pl_sample_line_idx,
+            pl_line_abc,
+            pl_line_cam_idx,
+            ba.image_width,
+            ba.image_height,
+            float(lambda_reproj),
+            float(lambda_line),
+            float(huber_px),
+            float(cauchy_px),
+            int(max_num_iterations),
+            int(num_threads),
+            bool(refine_intrinsics),
+            bool(refine_poses),
+            bool(refine_points),
+        )
+
+        opencv8 = np.asarray(res["opencv8"], dtype=np.float64)
+        camera_qvec_tvec = np.asarray(res["camera_qvec_tvec"], dtype=np.float64)
+        points_xyz = np.asarray(res["points_xyz"], dtype=np.float64)
+        print(f"[f04-ba] outer_iter={it} cost={float(res.get('final_cost', float('nan'))):.6g}", file=out)
+
+    assert isinstance(res, dict)
+    f04_metadata = {
+        "confidence_score": float(res.get("confidence_score", 0.0)),
+        "median_plumb_line_residual_px": float(res.get("median_plumb_line_residual_px", float("inf"))),
+        "line_count": int(res.get("line_count", 0)),
+    }
+
+    return {
+        "opencv8": opencv8,
+        "camera_qvec_tvec": camera_qvec_tvec,
+        "points_xyz": points_xyz,
+        "native": res,
+        "f04_metadata": f04_metadata,
+    }
 
 
 def refine_k1k2_plumbline_only(

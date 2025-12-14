@@ -54,6 +54,11 @@ Add an entry here at the end of each work session (and when closing a sprint) so
   - Decisions: Keep a uniform 3-block signature for plumb-line residuals during Phase 3 for implementation simplicity (pose/point blocks are ignored in the residual).
   - Next: Validate Phase 3 on a small real COLMAP model by extracting `obs_*` arrays from `images.bin/points3D.bin`; then integrate priors (`K1,K2` to Phase-2 result) and reprojection/plumb-line robust losses as defaults.
   - Blockers: None.
+- **Session 2025-12-14 (Cont.)** (Sprint 4 / F-04 Phase 3 Python Wrapper)
+  - Changes: Added Phase 3 Python wrapper `cinetracker.f04_plumbline.f04_hybrid_bundle_adjustment` to extract sparse BA arrays from COLMAP (`obs_uv/obs_cam_idx/obs_point_idx`), build per-image plumb-line arrays from image files, and call native `plumbline_refine_full_ba`. Fixed a pybind11 output stride bug for returned `opencv8` and added missing intrinsics priors (including `fx/fy`) to prevent solver divergence.
+  - Decisions: Wrapper runs an outer loop that refits `pl_line_abc` from fixed samples each iteration (mirrors Phase 1) to keep line constraints consistent as intrinsics update.
+  - Next: Add a CLI subcommand for Phase 3; implement model write-back (or export JSON/CSV) for optimized poses/points; validate on a larger dataset and tune weights/priors.
+  - Blockers: None.
 - **Session 2025-12-14** (Sprint 4 / Post-implementation)
   - Changes: Added a session/sprint log section and standardized project memory to a single canonical file with a compatibility pointer.
   - Decisions: Treat `PROJECT_MEMORY.md` as the canonical project memory file.

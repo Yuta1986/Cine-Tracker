@@ -402,6 +402,64 @@ py::dict plumbline_refine_full_ba(
     problem.SetParameterBlockConstant(intr.data());
   }
 
+  // Phase-3 stabilization priors (per PROJECT_MEMORY.md):
+  // - cx,cy prior to image center with sigma = 2% of dimensions
+  // - p1,p2 prior to 0 with sigma = 1e-6
+  // - k1,k2 prior to initial (Phase-2) result with sigma = 1e-3
+  const double cx0 = 0.5 * static_cast<double>(image_width);
+  const double cy0 = 0.5 * static_cast<double>(image_height);
+  const double sigma_cx = 0.02 * static_cast<double>(image_width);
+  const double sigma_cy = 0.02 * static_cast<double>(image_height);
+  const double sigma_p = 1e-6;
+  const double sigma_k = 1e-3;
+  const double fx0 = intr[0];
+  const double fy0 = intr[1];
+  const double sigma_fx = 0.05 * std::max(1.0, std::abs(fx0));
+  const double sigma_fy = 0.05 * std::max(1.0, std::abs(fy0));
+  const double k1_0 = intr[4];
+  const double k2_0 = intr[5];
+
+  if (refine_intrinsics) {
+    problem.AddResidualBlock(
+        new ceres::AutoDiffCostFunction<PriorIndexResidual, 1, 8>(new PriorIndexResidual(0, fx0, sigma_fx)),
+        nullptr,
+        intr.data());
+    problem.AddResidualBlock(
+        new ceres::AutoDiffCostFunction<PriorIndexResidual, 1, 8>(new PriorIndexResidual(1, fy0, sigma_fy)),
+        nullptr,
+        intr.data());
+    problem.AddResidualBlock(
+        new ceres::AutoDiffCostFunction<PriorIndexResidual, 1, 8>(new PriorIndexResidual(2, cx0, sigma_cx)),
+        nullptr,
+        intr.data());
+    problem.AddResidualBlock(
+        new ceres::AutoDiffCostFunction<PriorIndexResidual, 1, 8>(new PriorIndexResidual(3, cy0, sigma_cy)),
+        nullptr,
+        intr.data());
+    problem.AddResidualBlock(
+        new ceres::AutoDiffCostFunction<PriorIndexResidual, 1, 8>(new PriorIndexResidual(6, 0.0, sigma_p)),
+        nullptr,
+        intr.data());
+    problem.AddResidualBlock(
+        new ceres::AutoDiffCostFunction<PriorIndexResidual, 1, 8>(new PriorIndexResidual(7, 0.0, sigma_p)),
+        nullptr,
+        intr.data());
+    problem.AddResidualBlock(
+        new ceres::AutoDiffCostFunction<PriorIndexResidual, 1, 8>(new PriorIndexResidual(4, k1_0, sigma_k)),
+        nullptr,
+        intr.data());
+    problem.AddResidualBlock(
+        new ceres::AutoDiffCostFunction<PriorIndexResidual, 1, 8>(new PriorIndexResidual(5, k2_0, sigma_k)),
+        nullptr,
+        intr.data());
+
+    // Keep principal point within the image bounds.
+    problem.SetParameterLowerBound(intr.data(), 2, 0.0);
+    problem.SetParameterUpperBound(intr.data(), 2, static_cast<double>(image_width));
+    problem.SetParameterLowerBound(intr.data(), 3, 0.0);
+    problem.SetParameterUpperBound(intr.data(), 3, static_cast<double>(image_height));
+  }
+
   for (std::int64_t i = 0; i < C; ++i) {
     double* cptr = cameras.data() + i * 7;
     problem.AddParameterBlock(cptr, 7, &pose_manifold);
@@ -480,7 +538,7 @@ py::dict plumbline_refine_full_ba(
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
-  py::array_t<double> out_intr({8});
+  py::array_t<double> out_intr(py::array::ShapeContainer{static_cast<py::ssize_t>(8)});
   {
     auto r = out_intr.mutable_unchecked<1>();
     for (ssize_t i = 0; i < 8; ++i) {
