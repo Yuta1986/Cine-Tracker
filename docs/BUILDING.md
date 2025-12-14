@@ -54,6 +54,8 @@ Windows executables must be built on Windows (PyInstaller does not cross-compile
 - Recommended shortcut (reliable): `build_windows_quick.bat`
 - Optional interactive menu (prompts): `build_windows.bat --menu --pause`
 - `build_windows_easy.bat` is kept as a deprecated alias that forwards to `build_windows_quick.bat`.
+- If `.bat` parsing/tools keep failing in your environment, use the Python-driven entrypoint:
+  - `build_windows_python.bat --onedir --fetch-colmap --fetch-ffmpeg`
 
 ### Non-interactive build (good for CI / power users)
 - Recommended shortcut (no menu): `build_windows_quick.bat`
