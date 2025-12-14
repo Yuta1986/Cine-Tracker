@@ -131,7 +131,9 @@ py::dict plumbline_refine_k1k2_bridge(
 
   double k[2] = {k_init[0], k_init[1]};
 
-  ceres::Problem problem;
+  ceres::Problem::Options problem_options;
+  problem_options.loss_function_ownership = ceres::DO_NOT_TAKE_OWNERSHIP;
+  ceres::Problem problem(problem_options);
   const double sqrt_lambda = std::sqrt(std::max(0.0, lambda_line_weight));
 
   // Fixed robustifier for Phase-1 bridge (configurable via the legacy entrypoint).
@@ -216,7 +218,9 @@ py::dict plumbline_refine_k1k2(py::array_t<double, py::array::c_style | py::arra
 
   double k[2] = {k1, k2};
 
-  ceres::Problem problem;
+  ceres::Problem::Options problem_options;
+  problem_options.loss_function_ownership = ceres::DO_NOT_TAKE_OWNERSHIP;
+  ceres::Problem problem(problem_options);
   const double sqrt_lambda = std::sqrt(std::max(0.0, lambda_line));
 
   std::unique_ptr<ceres::LossFunction> loss;

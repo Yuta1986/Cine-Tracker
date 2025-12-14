@@ -29,6 +29,11 @@ Add an entry here at the end of each work session (and when closing a sprint) so
   - Decisions: Prefer `vcpkg` triplet `x64-windows-static-md` for Python CRT compatibility when producing `cinetracker_native.pyd`.
   - Next: Run Windows UAT (F-01/F-02/S4.1) using `docs/UAT_CHECKLIST.md`; begin native extension environment setup + incremental F-04 implementation on `feature/f-04-hybrid-calib`.
   - Blockers: None.
+- **Session 2025-12-14 (Cont.)** (Sprint 4 / F-04 WSL Native Build)
+  - Changes: Installed WSL build prerequisites (CMake/Ninja, `pybind11-dev`, `libceres-dev`, `python3.12-dev`); built `cinetracker_native` successfully via `python scripts/build_extension.py`; fixed a native segfault caused by Ceres loss-function ownership (double-free) by setting `loss_function_ownership=DO_NOT_TAKE_OWNERSHIP`.
+  - Decisions: Keep both pybind overloads for `plumbline_refine_k1k2` (legacy scalar args + new array-based bridge signature) for compatibility and incremental migration.
+  - Next: Implement the next F-04 native blocks on `feature/f-04-hybrid-calib` (priors + staged unlocks); add a real-data regression test for the Phase-1 refine pipeline.
+  - Blockers: None.
 - **Session 2025-12-14** (Sprint 4 / Post-implementation)
   - Changes: Added a session/sprint log section and standardized project memory to a single canonical file with a compatibility pointer.
   - Decisions: Treat `PROJECT_MEMORY.md` as the canonical project memory file.
