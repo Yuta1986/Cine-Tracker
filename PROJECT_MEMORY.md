@@ -39,6 +39,21 @@ Add an entry here at the end of each work session (and when closing a sprint) so
   - Decisions: Phase 2 priors are applied on the single 8-parameter block (avoid overlapping parameter blocks); keep fx/fy constrained positive.
   - Next: Wire Phase 2 native call into Python pipeline (new CLI flag/subcommand) and validate on real image sets; extend to staged Phase 3 once reprojection residuals + structure are integrated.
   - Blockers: None.
+- **Session 2025-12-14 (Cont.)** (Sprint 4 / F-04 Phase 3 Interface Draft)
+  - Changes: Drafted Phase 3 native Ceres interface and NumPy data layout (shared OPENCV8, sparse BA observations, and plumb-line constraints) plus return dict schema for downstream `f04_metadata`.
+  - Decisions: Keep plumb-line `line_abc` fixed per solve call (outer-loop line refit remains in Python).
+  - Next: Implement `plumbline_refine_full_ba` in native extension and add Python extraction of COLMAP tracks/observations; run Phase 3 on a small real dataset.
+  - Blockers: None.
+- **Session 2025-12-14 (Cont.)** (Sprint 4 / F-04 Phase 3 Reprojection Wiring)
+  - Changes: Implemented Phase 3 native function skeleton `plumbline_refine_full_ba` with NumPy array mapping, Ceres parameter blocks (shared OPENCV8 + pose product manifold + points), and reprojection residual wiring; compiled and smoke-tested on a 1-camera/1-point toy case.
+  - Decisions: Use `ProductManifold<QuaternionManifold, EuclideanManifold<3>>` for 7D pose blocks (`qw,qx,qy,qz,tx,ty,tz`).
+  - Next: Add plumb-line residual blocks (shared 3-block signature) and compute return metrics (`median_plumb_line_residual_px`, coverage, confidence); then validate on a small real COLMAP model.
+  - Blockers: None.
+- **Session 2025-12-14 (Cont.)** (Sprint 4 / F-04 Phase 3 Plumb-Line Wiring)
+  - Changes: Wired plumb-line residual blocks into `plumbline_refine_full_ba` using `AutoDiffCostFunction<PlumbLineResidualFullBA, 1, 7, 3, 8>` with a shared dummy point block; added post-solve metrics (`median_plumb_line_residual_px`, `coverage_spatial`, `confidence_score`, `line_count`) to the return dict; compiled and smoke-tested with a 1-sample toy constraint.
+  - Decisions: Keep a uniform 3-block signature for plumb-line residuals during Phase 3 for implementation simplicity (pose/point blocks are ignored in the residual).
+  - Next: Validate Phase 3 on a small real COLMAP model by extracting `obs_*` arrays from `images.bin/points3D.bin`; then integrate priors (`K1,K2` to Phase-2 result) and reprojection/plumb-line robust losses as defaults.
+  - Blockers: None.
 - **Session 2025-12-14** (Sprint 4 / Post-implementation)
   - Changes: Added a session/sprint log section and standardized project memory to a single canonical file with a compatibility pointer.
   - Decisions: Treat `PROJECT_MEMORY.md` as the canonical project memory file.
@@ -100,6 +115,10 @@ Add an entry here at the end of each work session (and when closing a sprint) so
 | **F-04 Core Method** | Defined | Constrained bundle adjustment (joint optimization) regularized by the **Plumb-Line Constraint** derived from detected 2D line segments. Reprojection error remains in the cost function to anchor the solution to 3D structure. |
 | **F-04 Backend** | Defined (Deferred) | Custom **Ceres Solver** C++ extension via **pybind11** for performance/robustness; requires cross-platform native builds (Windows DLL via MSVC). |
 | **F-04 Optimization Scope** | Defined | **Staged Joint BA** with incremental unlock: Phase 1 optimize `K1,K2` only; Phase 2 optimize `K1,K2,P1,P2` + intrinsics (`fx,fy,cx,cy`) while holding poses/points; Phase 3 optimize distortion + intrinsics + poses + 3D points (full joint constrained BA). Final delivery runs **Phase 3** with strong priors/damping on weak parameters (`P1,P2,cx,cy`). |
+| **F-04 Phase 3 Native API** | Draft (Spec) | Proposed native entrypoint: `plumbline_refine_full_ba(...)` (Ceres) minimizing **Reprojection Error + Plumb-Line Error** over shared OPENCV8 intrinsics/distortion + per-image poses + 3D points. Lines (`line_abc`) are treated as fixed per solve call (outer-loop line refit remains in Python, mirroring Phase 1). |
+| **F-04 Phase 3 BA Input Layout** | Draft (Spec) | Standard BA arrays (all 0-based indices): `points_xyz` (P,3) float64; `camera_qvec_tvec` (C,7) float64 (`qw,qx,qy,qz,tx,ty,tz`, COLMAP world→cam convention); observations: `obs_uv` (N,2) float64 distorted pixels + `obs_cam_idx` (N,) int32 + `obs_point_idx` (N,) int32. Shared intrinsics/distortion: `opencv8` (8,) float64 (`fx,fy,cx,cy,k1,k2,p1,p2`). |
+| **F-04 Phase 3 Plumb-Line Layout** | Draft (Spec) | Plumb-line arrays: `pl_sample_uv` (M,2) float64 distorted pixels; `pl_sample_line_idx` (M,) int32 indexing `pl_line_abc`; `pl_line_abc` (L,3) float64 line params in **undistorted pixel space**; `pl_line_cam_idx` (L,) int32 mapping each line to a camera/image. (Each sample’s camera is implied by `pl_line_cam_idx[pl_sample_line_idx]`.) |
+| **F-04 Phase 3 Outputs** | Draft (Spec) | Return updated `opencv8`, `camera_qvec_tvec`, `points_xyz`, solver summary, and quality metrics needed to populate `f04_metadata` (confidence, median residual, counts). |
 | **F-04 Output Schema** | Defined | Reuse the standard `lens_calibration_data.json` OPENCV keys for intrinsics/distortion. When generated by F-04, add `f04_metadata` with fit-quality metrics: `confidence_score` (0.0–1.0), `median_plumb_line_residual_px`, `line_count`. |
 | **F-04 Confidence Metric** | Defined | `confidence_score` is `S_conf = C_spatial * exp(-α * E_median)`, where `C_spatial` is 8×8 grid coverage (fraction of cells containing ≥1 line sample), `E_median` is `median_plumb_line_residual_px`, and `α = -ln(0.9) ≈ 0.10536` so `E_median=1.0px` at `C_spatial=1.0` yields `S_conf≈0.9`. UAT thresholds: Pass `≥0.7`, Warning `[0.4,0.7)`, Reject `<0.4`. |
 | **F-04 Optimization Priors** | Defined | Phase 3 uses Ceres NormalPriors to prevent degeneracy: `cx,cy` prior to image center with `σx=0.02*W`, `σy=0.02*H`; tangential `P1,P2` prior 0 with `σ=1e-6`; radial `K1,K2` prior to Phase-2 result with `σ=1e-3`. |
