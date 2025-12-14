@@ -64,6 +64,11 @@ Add an entry here at the end of each work session (and when closing a sprint) so
   - Decisions: Keep Phase 3 outputs as JSON + optional NPZ until a COLMAP binary writer is implemented.
   - Next: Run the new CLI on a small model for a repeatable demo; then decide on a model write-back/export format.
   - Blockers: None.
+- **Session 2025-12-14 (Cont.)** (Sprint 4 / Windows UAT Beginner Guide)
+  - Changes: Rewrote `docs/UAT_CHECKLIST.md` to be beginner-friendly with a clear quickstart flow and PASS/FAIL criteria for UAT-WIN-00..06.
+  - Decisions: Keep UAT steps aligned with baseline (F-01/F-02 + UE import) as the release gate before merging F-04.
+  - Next: Execute Windows UAT and record results for each test case.
+  - Blockers: None (requires running on Windows + UE 5.7).
 - **Session 2025-12-14** (Sprint 4 / Post-implementation)
   - Changes: Added a session/sprint log section and standardized project memory to a single canonical file with a compatibility pointer.
   - Decisions: Treat `PROJECT_MEMORY.md` as the canonical project memory file.
