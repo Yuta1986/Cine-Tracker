@@ -1,5 +1,11 @@
 # Cine-Tracker
 
+## Quickstart
+
+- Just want to run a Windows build / do UAT (no Python): `docs/BUILDING.md`
+- Want to develop / run from source (all OSes): `docs/BUILDING.md`
+- UAT checklist (Windows baseline): `docs/UAT_CHECKLIST.md`
+
 ## Virtual environment (required)
 
 Development outside a virtual environment is not supported.

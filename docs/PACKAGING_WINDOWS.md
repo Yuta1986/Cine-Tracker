@@ -1,5 +1,7 @@
 # Sprint 3 — Windows Packaging Plan (PyInstaller)
 
+For a user-facing “how to build/run” guide (devs vs testers vs packagers), see: `docs/BUILDING.md`.
+
 Target: ship a standalone Windows executable bundling:
 - Python + our `cinetracker` package
 - External binaries: `colmap.exe` (+ required DLLs) and `ffmpeg.exe` (+ DLLs if needed)

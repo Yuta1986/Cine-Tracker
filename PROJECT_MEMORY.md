@@ -74,6 +74,11 @@ Add an entry here at the end of each work session (and when closing a sprint) so
   - Decisions: Treat `PROJECT_MEMORY.md` as the canonical project memory file.
   - Next: Keep this log updated every session/sprint; run UE 5.7 UAT and Windows build when ready.
   - Blockers: None in-repo; UE validation requires running Unreal Engine.
+- **Session 2025-12-14 (Cont.)** (Sprint 4 / UAT Docs Polish)
+  - Changes: Polished `docs/UAT_CHECKLIST.md` for beginner readability (Windows path formatting, evidence capture guidance, common-issues triage) and updated `docs/DOCUMENTATION_OUTLINE.md` to explicitly reference UAT and the F-04 Phase 3 interface doc.
+  - Decisions: Keep UAT checklist focused on baseline F-01/F-02 + UE import as the release gate before merging F-04.
+  - Next: Execute UAT-WIN-00..06 on Windows + UE 5.7 and record PASS/FAIL evidence per test case.
+  - Blockers: Requires human-run UAT on Windows + UE 5.7.
 
 ## 1. Project Goal & Scope
 **Objective:** Create a Python/COLMAP desktop application for high-precision camera tracking optimized for Unreal Engine (UE) Composure.

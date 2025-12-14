@@ -13,11 +13,20 @@ This document is written for beginner developers running the **Windows baseline 
 ## What You Need
 - Windows machine with Unreal Engine **5.7** installed.
 - The built Cine-Tracker app:
-  - Preferred (onedir): `dist\\windows\\onedir\\Windows_CineTracker\\Windows_CineTracker.exe`
-  - Or (onefile): `dist\\windows\\onefile\\Windows_CineTracker.exe`
+  - Preferred (onedir): `dist\windows\onedir\Windows_CineTracker\Windows_CineTracker.exe`
+  - Or (onefile): `dist\windows\onefile\Windows_CineTracker.exe`
 - Two videos:
   - Calibration (checkerboard) video for **F-01**
   - Tracking/scene video for **F-02**
+- If Windows reports missing runtime DLLs like `MSVCP140.dll` / `VCRUNTIME140.dll`:
+  - Install **Microsoft Visual C++ Redistributable for Visual Studio 2015–2022 (x64)**.
+
+## Recommended Folder Layout (Avoid Confusion)
+- Create a short working folder, for example: `C:\CineTracker\UAT\`
+- Use subfolders per test run, for example:
+  - `C:\CineTracker\UAT\f01_run1`
+  - `C:\CineTracker\UAT\f01_run2`
+  - `C:\CineTracker\UAT\f02_run1`
 
 ## Environment (Required)
 - UE version is **5.7** (target).
@@ -25,7 +34,13 @@ This document is written for beginner developers running the **Windows baseline 
   - Camera Calibration / Lens Distortion
   - Alembic Importer
   - Sequencer
-- Windows build contains `Windows_CineTracker.exe` and bundled binaries in `_internal\\third_party\\bin`.
+- Windows build contains `Windows_CineTracker.exe` and bundled binaries in `_internal\third_party\bin`.
+
+## Evidence to Capture (So Results Are Actionable)
+For each UAT case, record:
+- Result: PASS / FAIL
+- Evidence: output folder path + any app log text (copy/paste) + screenshots (optional)
+- Notes: anything unusual (slow, warnings, unexpected UI states)
 
 ## Capture Guide (for best results)
 
@@ -70,18 +85,14 @@ Tracking video (the scene):
 
 ## Windows Build UAT — Test Cases (F-01/F-02/S4.1)
 
-For each test case, record:
-- Result: PASS / FAIL
-- Evidence: output folder path + any app log text (copy/paste) + screenshots (optional)
-
 ### UAT-WIN-00 — Build Artifact Sanity
 Goal: confirm the packaged executable and bundled binaries are present.
 
 Steps:
 - Locate the built app:
-  - Onedir: `dist\\windows\\onedir\\Windows_CineTracker\\Windows_CineTracker.exe`
-  - Onefile: `dist\\windows\\onefile\\Windows_CineTracker.exe`
-- For onedir builds, confirm bundled binaries exist under `_internal\\third_party\\bin\\`:
+  - Onedir: `dist\windows\onedir\Windows_CineTracker\Windows_CineTracker.exe`
+  - Onefile: `dist\windows\onefile\Windows_CineTracker.exe`
+- For onedir builds, confirm bundled binaries exist under `_internal\third_party\bin\`:
   - `colmap.exe`, `ffmpeg.exe`, `ffprobe.exe`
 - Launch `Windows_CineTracker.exe`.
 
@@ -107,7 +118,7 @@ Goal: generate a valid `lens_calibration_data.json` from checkerboard footage.
 
 Steps:
 - Set **F-01 Video** to a checkerboard calibration video (30–90s).
-- Set **F-01 Output Dir** to an empty folder (example): `C:\\CineTracker\\UAT\\f01_run1`
+- Set **F-01 Output Dir** to an empty folder (example): `C:\CineTracker\UAT\f01_run1`
 - Click **Run F-01 (Calibration)**.
 
 Verify:
@@ -124,7 +135,7 @@ Pass criteria:
 Goal: confirm calibration stability.
 
 Steps:
-- Repeat UAT-WIN-02 using the same input video to another empty folder (example): `C:\\CineTracker\\UAT\\f01_run2`
+- Repeat UAT-WIN-02 using the same input video to another empty folder (example): `C:\CineTracker\UAT\f01_run2`
 - Compare the two `lens_calibration_data.json` files.
 
 Pass criteria:
@@ -136,7 +147,7 @@ Goal: generate `camera_path.abc` using fixed intrinsics.
 Steps:
 - Set **F-02 Video** to a tracking/scene video (texture + parallax, minimal blur).
 - Set **F-02 Lens JSON** to the `lens_calibration_data.json` from UAT-WIN-02.
-- Set **F-02 Output Dir** to an empty folder (example): `C:\\CineTracker\\UAT\\f02_run1`
+- Set **F-02 Output Dir** to an empty folder (example): `C:\CineTracker\UAT\f02_run1`
 - Click **Run F-02 (Tracking)**.
 
 Verify:
@@ -150,6 +161,9 @@ Goal: validate UE integration on the baseline build.
 
 Steps (in UE 5.7):
 - Ensure required plugins are enabled (Camera Calibration/Lens Distortion, Alembic Importer, Sequencer).
+- Run scripts using one of:
+  - UE menu: **Tools → Execute Python Script...**
+  - Output Log: enable Python and run `py "C:\path\to\script.py"` (workflow varies by UE config)
 - Run `ue_scripts/s4_1_create_lens_file.py` using the UAT-WIN-02 `lens_calibration_data.json`.
 - Run `ue_scripts/s4_2_import_alembic_and_bind.py` using the UAT-WIN-04 `camera_path.abc`.
 
@@ -163,10 +177,15 @@ Goal: confirm failure modes are safe and actionable.
 
 Steps:
 - Missing bundled binaries:
-  - Temporarily rename `_internal\\third_party\\bin\\ffmpeg.exe`
+  - Temporarily rename `_internal\third_party\bin\ffmpeg.exe`
   - Run F-01 or F-02 again.
 - Invalid JSON:
   - Provide a corrupt JSON or non-OPENCV JSON to F-02.
 
 Pass criteria:
 - Clear error messages; no crash; app remains usable after the error.
+
+## Common Issues (Quick Triage)
+- `MSVCP140.dll` / `VCRUNTIME140.dll` missing: install **Microsoft Visual C++ Redistributable for Visual Studio 2015–2022 (x64)**.
+- Long paths / permission issues: prefer a short writable folder like `C:\CineTracker\UAT\` instead of Desktop/OneDrive.
+- UE scripts don’t run: confirm UE Python is enabled and the scripts are executed from the UE editor (not from Windows Explorer).
