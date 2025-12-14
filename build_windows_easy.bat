@@ -1,21 +1,17 @@
 @echo off
 setlocal EnableExtensions
 
-rem Beginner-friendly guided build (opens prompts and pauses at the end).
-rem This wrapper *also* pauses on failure so errors don't flash and disappear.
+rem Deprecated: legacy "easy" wrapper used an interactive menu.
+rem Use the non-interactive shortcut for best reliability.
+
+echo NOTE: build_windows_easy.bat is deprecated.
+echo       Running build_windows_quick.bat instead (no interactive prompts).
+echo.
 
 pushd "%~dp0"
-call build_windows.bat --menu %*
+call build_windows_quick.bat %*
 set "EC=%ERRORLEVEL%"
 popd
 
-if not "%EC%"=="0" (
-  echo.
-  echo Build failed with exit code %EC%.
-  echo If the window closed immediately before, run from a terminal so you can read errors:
-  echo   - CMD:        build_windows_easy.bat
-  echo   - PowerShell: .\\build_windows_easy.bat
-)
-
-pause
 exit /b %EC%
+

@@ -49,16 +49,20 @@ Windows executables must be built on Windows (PyInstaller does not cross-compile
   - Visual Studio 2022 / Build Tools, and ideally run from **Developer Command Prompt for VS 2022**
 
 ### Guided build (beginner-friendly)
-- Run `build_windows_easy.bat`
-  - This opens a menu and pauses even on failure so you can read errors.
+- Recommended shortcut (reliable): `build_windows_quick.bat`
+- Optional interactive menu (prompts): `build_windows.bat --menu --pause`
+- `build_windows_easy.bat` is kept as a deprecated alias that forwards to `build_windows_quick.bat`.
 
 ### Non-interactive build (good for CI / power users)
+- Recommended shortcut (no menu): `build_windows_quick.bat`
+- Or run directly:
 - Build both outputs (recommended): `build_windows.bat --fetch-colmap --fetch-ffmpeg`
 - Build onedir only: `build_windows.bat --onedir --fetch-colmap --fetch-ffmpeg`
 - Build onefile only: `build_windows.bat --onefile --fetch-colmap --fetch-ffmpeg`
 
 ### Notes
 - Avoid running from `\\wsl.localhost\...` as the current directory in CMD (UNC paths can fail). If needed, start CMD normally and `pushd` into the repo folder.
+- If the guided menu fails in your shell environment, use `build_windows_quick.bat` (no interactive prompts) or run `build_windows.bat ...` directly.
 - Outputs:
   - Onedir: `dist\windows\onedir\Windows_CineTracker\Windows_CineTracker.exe`
   - Onefile: `dist\windows\onefile\Windows_CineTracker.exe`

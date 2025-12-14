@@ -8,6 +8,12 @@ rem   Onefile: dist\windows\onefile\Windows_CineTracker.exe
 
 pushd "%~dp0"
 
+rem Use absolute paths for common Windows tools so Git/MSYS/etc. don't shadow them.
+set "WIN_SYSTEM32=%SystemRoot%\System32"
+set "CHOICE_EXE=%WIN_SYSTEM32%\choice.exe"
+set "WHERE_EXE=%WIN_SYSTEM32%\where.exe"
+set "EXPLORER_EXE=%WIN_SYSTEM32%\explorer.exe"
+
 set "VENV_DIR=.venv-win"
 set "PY=%VENV_DIR%\Scripts\python.exe"
 
@@ -15,7 +21,7 @@ set "FETCH_COLMAP=0"
 set "FETCH_FFMPEG=0"
 set "BUILD_NATIVE=0"
 set "FORCE=0"
-set "OUT_DIR=dist\\windows"
+set "OUT_DIR=dist\windows"
 set "MODE=both"
 set "MENU=0"
 set "PAUSE_ON_EXIT=0"
@@ -97,7 +103,11 @@ goto parse_args
 
 :args_done
 
-where python >nul 2>nul
+if not exist "%WHERE_EXE%" (
+  echo ERROR: Missing %WHERE_EXE%
+  exit /b 1
+)
+"%WHERE_EXE%" python >nul 2>nul
 if errorlevel 1 (
   echo Python not found on PATH. Install Python 3.10+ and try again.
   exit /b 1
@@ -176,7 +186,7 @@ if not exist "third_party\\bin\\ffprobe.exe" (
 set "APP_NAME=Windows_CineTracker"
 if defined CINETRACKER_APP_NAME set "APP_NAME=%CINETRACKER_APP_NAME%"
 
-set "PYI=%VENV_DIR%\\Scripts\\pyinstaller.exe"
+set "PYI=%VENV_DIR%\Scripts\pyinstaller.exe"
 
 if /I "%MODE%"=="onedir" set "MODE=onedir"
 if /I "%MODE%"=="onefile" set "MODE=onefile"
@@ -189,36 +199,71 @@ echo Invalid build mode: %MODE%
 goto usage
 
 :do_onedir
+  if not exist "%PYI%" (
+    echo ERROR: PyInstaller not found at: %PYI%
+    echo        Try rerunning, or run: "%PY%" -m pip install -U pyinstaller
+    exit /b 1
+  )
+  if not exist "packaging\\cinetracker.spec" (
+    echo ERROR: Missing spec file: packaging\\cinetracker.spec
+    exit /b 1
+  )
   echo Building (onedir) with PyInstaller...
-  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\\onedir" --workpath "build\\pyinstaller\\onedir" packaging\\cinetracker.spec
+  echo   "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\onedir" --workpath "build\\pyinstaller\\onedir" packaging\\cinetracker.spec
+  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\onedir" --workpath "build\\pyinstaller\\onedir" packaging\\cinetracker.spec
   if errorlevel 1 exit /b 1
   goto done_build
 
 :do_onefile
+  if not exist "%PYI%" (
+    echo ERROR: PyInstaller not found at: %PYI%
+    echo        Try rerunning, or run: "%PY%" -m pip install -U pyinstaller
+    exit /b 1
+  )
+  if not exist "packaging\\cinetracker_onefile.spec" (
+    echo ERROR: Missing spec file: packaging\\cinetracker_onefile.spec
+    exit /b 1
+  )
   echo Building (onefile) with PyInstaller...
-  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\\onefile" --workpath "build\\pyinstaller\\onefile" packaging\\cinetracker_onefile.spec
+  echo   "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\onefile" --workpath "build\\pyinstaller\\onefile" packaging\\cinetracker_onefile.spec
+  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\onefile" --workpath "build\\pyinstaller\\onefile" packaging\\cinetracker_onefile.spec
   if errorlevel 1 exit /b 1
   goto done_build
 
 :do_both
+  if not exist "%PYI%" (
+    echo ERROR: PyInstaller not found at: %PYI%
+    echo        Try rerunning, or run: "%PY%" -m pip install -U pyinstaller
+    exit /b 1
+  )
+  if not exist "packaging\\cinetracker.spec" (
+    echo ERROR: Missing spec file: packaging\\cinetracker.spec
+    exit /b 1
+  )
+  if not exist "packaging\\cinetracker_onefile.spec" (
+    echo ERROR: Missing spec file: packaging\\cinetracker_onefile.spec
+    exit /b 1
+  )
   echo Building (onedir) with PyInstaller...
-  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\\onedir" --workpath "build\\pyinstaller\\onedir" packaging\\cinetracker.spec
+  echo   "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\onedir" --workpath "build\\pyinstaller\\onedir" packaging\\cinetracker.spec
+  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\onedir" --workpath "build\\pyinstaller\\onedir" packaging\\cinetracker.spec
   if errorlevel 1 exit /b 1
   echo Building (onefile) with PyInstaller...
-  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\\onefile" --workpath "build\\pyinstaller\\onefile" packaging\\cinetracker_onefile.spec
+  echo   "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\onefile" --workpath "build\\pyinstaller\\onefile" packaging\\cinetracker_onefile.spec
+  "%PYI%" --clean --noconfirm --distpath "%OUT_DIR%\onefile" --workpath "build\\pyinstaller\\onefile" packaging\\cinetracker_onefile.spec
   if errorlevel 1 exit /b 1
   goto done_build
 
 :done_build
 echo.
 echo Build complete:
-if "%MODE%"=="onedir" echo   Onedir:  %OUT_DIR%\\onedir\\%APP_NAME%\\%APP_NAME%.exe
-if "%MODE%"=="onefile" echo   Onefile: %OUT_DIR%\\onefile\\%APP_NAME%.exe
-if "%MODE%"=="both" echo   Onedir:  %OUT_DIR%\\onedir\\%APP_NAME%\\%APP_NAME%.exe
-if "%MODE%"=="both" echo   Onefile: %OUT_DIR%\\onefile\\%APP_NAME%.exe
+if "%MODE%"=="onedir" echo   Onedir:  %OUT_DIR%\onedir\%APP_NAME%\%APP_NAME%.exe
+if "%MODE%"=="onefile" echo   Onefile: %OUT_DIR%\onefile\%APP_NAME%.exe
+if "%MODE%"=="both" echo   Onedir:  %OUT_DIR%\onedir\%APP_NAME%\%APP_NAME%.exe
+if "%MODE%"=="both" echo   Onefile: %OUT_DIR%\onefile\%APP_NAME%.exe
 echo.
 echo Opening output folder...
-explorer "%OUT_DIR%" >nul 2>nul
+"%EXPLORER_EXE%" "%OUT_DIR%" >nul 2>nul
 echo.
 popd
 if "%PAUSE_ON_EXIT%"=="1" pause
@@ -230,23 +275,27 @@ echo Cine-Tracker Windows build (guided)
 echo ---------------------------------
 echo.
 echo Choose build type:
-choice /C 123 /M "[1] both  [2] onedir  [3] onefile"
+if not exist "%CHOICE_EXE%" (
+  echo ERROR: Missing %CHOICE_EXE%
+  exit /b 1
+)
+"%CHOICE_EXE%" /C 123 /M "[1] both  [2] onedir  [3] onefile"
 if errorlevel 3 set "MODE=onefile"
 if errorlevel 2 set "MODE=onedir"
 if errorlevel 1 set "MODE=both"
 
 echo.
-choice /C YN /M "Download COLMAP Windows CUDA build into third_party\\bin? (recommended)"
+"%CHOICE_EXE%" /C YN /M "Download COLMAP Windows CUDA build into third_party\\bin? (recommended)"
 if errorlevel 2 set "FETCH_COLMAP=0"
 if errorlevel 1 set "FETCH_COLMAP=1"
 
 echo.
-choice /C YN /M "Download FFmpeg Windows build into third_party\\bin? (recommended)"
+"%CHOICE_EXE%" /C YN /M "Download FFmpeg Windows build into third_party\\bin? (recommended)"
 if errorlevel 2 set "FETCH_FFMPEG=0"
 if errorlevel 1 set "FETCH_FFMPEG=1"
 
 echo.
-choice /C YN /M "Choose output folder in Explorer?"
+"%CHOICE_EXE%" /C YN /M "Choose output folder in Explorer?"
 if errorlevel 2 exit /b 0
 call :choose_out
 exit /b %errorlevel%
