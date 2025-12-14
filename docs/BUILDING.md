@@ -57,6 +57,7 @@ Windows executables must be built on Windows (PyInstaller does not cross-compile
 
 ### Non-interactive build (good for CI / power users)
 - Recommended shortcut (no menu): `build_windows_quick.bat`
+- If you cannot download from GitHub in your environment: `build_windows_quick_no_fetch.bat`
 - Or run directly:
 - Build both outputs (recommended): `build_windows.bat --fetch-colmap --fetch-ffmpeg`
 - Build onedir only: `build_windows.bat --onedir --fetch-colmap --fetch-ffmpeg`

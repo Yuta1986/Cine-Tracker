@@ -60,6 +60,7 @@ From a Windows terminal in the repo root:
 - Choose output folder in Explorer: `build_windows.bat --choose-out`
 - Explicit output folder: `build_windows.bat --out "D:\\Apps\\CineTracker" --fetch-colmap --fetch-ffmpeg`
 - Recommended shortcut (no menu): `build_windows_quick.bat`
+- If downloads are blocked / you already have binaries: `build_windows_quick_no_fetch.bat`
 - Interactive menu (prompts): `build_windows.bat --menu --pause`
 - Deprecated alias (forwards to quick): `build_windows_easy.bat`
 

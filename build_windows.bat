@@ -128,15 +128,20 @@ if not exist "%PY%" (
 echo Upgrading packaging tools...
 "%PY%" -m pip install -U pip setuptools wheel
 if errorlevel 1 exit /b 1
+echo OK: packaging tools updated.
 
 echo Installing project + dependencies...
 rem Extras are optional in pyproject; this ensures core/ui deps are present.
 "%PY%" -m pip install -e ".[core,ui,io]"
 if errorlevel 1 exit /b 1
+echo OK: project deps installed.
 
 echo Installing PyInstaller...
 "%PY%" -m pip install -U pyinstaller
 if errorlevel 1 exit /b 1
+echo OK: PyInstaller installed.
+echo Build settings: MODE=%MODE%  OUT_DIR=%OUT_DIR%
+echo Fetch flags:   COLMAP=%FETCH_COLMAP%  FFMPEG=%FETCH_FFMPEG%  NATIVE=%BUILD_NATIVE%
 
 if "%BUILD_NATIVE%"=="1" (
   if not defined VSINSTALLDIR (
@@ -160,6 +165,7 @@ if "%FETCH_COLMAP%"=="1" (
     "%PY%" scripts\fetch_colmap_windows_cuda.py
   )
   if errorlevel 1 exit /b 1
+  echo OK: COLMAP fetched.
 )
 
 if "%FETCH_FFMPEG%"=="1" (
@@ -170,6 +176,7 @@ if "%FETCH_FFMPEG%"=="1" (
     "%PY%" scripts\fetch_ffmpeg_windows.py
   )
   if errorlevel 1 exit /b 1
+  echo OK: FFmpeg fetched.
 )
 
 if not exist "third_party\\bin\\colmap.exe" (
