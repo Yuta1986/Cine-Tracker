@@ -1,5 +1,19 @@
 # Cine-Tracker
 
+## What it does
+
+Cine-Tracker is a desktop app + CLI for turning smartphone video into **lens calibration** and **camera tracking** data for Unreal Engine virtual production workflows. It orchestrates **FFmpeg** (frame extraction) and **COLMAP** (SfM) to produce:
+
+- `lens_calibration_data.json` — lens intrinsics + distortion (OpenCV model)
+- `camera_path.abc` — Alembic camera animation for import into UE
+
+Key features:
+- **Calibration Mode (F-01)**: estimate lens intrinsics/distortion from chessboard footage and export `lens_calibration_data.json`.
+- **Tracking Mode (F-02)**: track camera motion from scene footage using *fixed intrinsics* and export `camera_path.abc`.
+- **Fixed-intrinsics injection**: write intrinsics into COLMAP `database.db` so tracking runs keep the calibration locked.
+- **GUI + CLI tooling**: `cinetracker gui`, `cinetracker doctor`, `cinetracker inject-intrinsics`, `cinetracker inspect-model`.
+- **Advanced distortion refinement (F-04)**: plumb-line constraints / joint BA via an optional native extension (in development).
+
 ## Quickstart
 
 - Just want to run a Windows build / do UAT (no Python): `docs/BUILDING.md`
