@@ -1,0 +1,4 @@
+# Runtime deps for dev-from-source (matches "-e .[core,ui,io]" + OpenCV features)
+numpy>=1.24
+PySide6>=6.5
+opencv-python
